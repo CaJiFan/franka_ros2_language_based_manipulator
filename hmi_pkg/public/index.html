@@ -1,0 +1,637 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>HMI Voice Control</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+body {
+    font-family: system-ui, -apple-system, sans-serif;
+    margin: 20px;
+    max-width: 760px;
+    background: #f5f5f5;
+}
+.container {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+h3 {
+    color: #333;
+    margin-top: 0;
+}
+pre {
+    background: #111;
+    color: #0f0;
+    padding: 12px;
+    min-height: 120px;
+    border-radius: 8px;
+    white-space: pre-wrap;
+    font-family: 'Courier New', monospace;
+    margin: 10px 0;
+}
+button {
+    padding: 10px 16px;
+    margin-right: 8px;
+    margin-bottom: 8px;
+    border: none;
+    border-radius: 6px;
+    background: #007bff;
+    color: white;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+button:hover:not(:disabled) {
+    background: #0056b3;
+    transform: translateY(-1px);
+}
+button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+button.recording {
+    background: #dc3545;
+    animation: pulse 1.5s infinite;
+}
+button.success {
+    background: #28a745;
+}
+button.warning {
+    background: #ffc107;
+    color: #333;
+}
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+}
+.badge {
+    display: inline-block;
+    background: #eee;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+}
+.badge.connected { background: #d4edda; color: #155724; }
+.badge.recording { background: #f8d7da; color: #721c24; }
+.badge.pending { background: #fff3cd; color: #856404; }
+.badge.locked { background: #cce5ff; color: #004085; }
+.badge.error { background: #f8d7da; color: #721c24; }
+small {
+    color: #666;
+    font-size: 12px;
+}
+.row {
+    margin: 12px 0;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.row label {
+    font-weight: 600;
+    margin-right: 8px;
+    min-width: 100px;
+}
+kbd {
+    background: #f0f0f0;
+    border-radius: 4px;
+    padding: 2px 6px;
+    border: 1px solid #ccc;
+    font-family: monospace;
+    font-size: 13px;
+}
+.intent-display {
+    background: #f8f9fa;
+    border-left: 4px solid #007bff;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 4px;
+}
+.audio-meter {
+    display: inline-block;
+    width: 150px;
+    height: 20px;
+    background: #e0e0e0;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 0 10px;
+}
+.audio-meter-fill {
+    height: 100%;
+    background: linear-gradient(to right, #28a745, #ffc107, #dc3545);
+    transition: width 0.1s;
+    width: 0%;
+}
+.error-message {
+    color: #dc3545;
+    font-size: 13px;
+    margin-top: 5px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<h3>🎙️ Franka HMI — Voice Control System</h3>
+
+<div class="row">
+    <button id="mic" class="success">🎙️ Start Recording</button>
+    <button id="stop" disabled>⏹️ Stop Recording</button>
+    <button id="confirm" disabled class="success">✅ Confirm Command</button>
+    <button id="discard" disabled class="warning">❌ Discard Command</button>
+</div>
+
+<div class="row">
+    <small>💡 Tip: Hold <kbd>Space</kbd> for push-to-talk mode</small>
+</div>
+
+<div class="row">
+    <label>Status:</label>
+    <span id="status" class="badge">idle</span>
+</div>
+
+<div class="row">
+    <label>Transcript:</label>
+    <span id="tx"></span>
+</div>
+
+<div class="row">
+    <label>Audio Level:</label>
+    <div class="audio-meter">
+        <div id="lvl-bar" class="audio-meter-fill"></div>
+    </div>
+    <small id="bytes">0 B</small>
+</div>
+
+<div class="row" id="error-row" style="display: none;">
+    <label>Error:</label>
+    <span id="err" class="error-message"></span>
+</div>
+
+<div id="intent-container" style="display: none;">
+    <h4>📋 Parsed Command:</h4>
+    <pre id="intent"></pre>
+</div>
+
+<div style="margin-top: 20px;">
+    <small>Available Commands: pick, release, next, stop, cancel | Objects: cup, bottle, mug, can</small>
+</div>
+</div>
+
+<script>
+// State management
+let ws = null;
+let audioCtx = null;
+let proc = null;
+let mediaStream = null;
+let sentBytes = 0;
+let lastSig = null;
+let lastConfirmedSig = null;
+let isRecording = false;
+let isLocked = false;
+let reconnectAttempts = 0;
+let reconnectTimer = null;
+
+// UI elements
+const micBtn = document.getElementById('mic');
+const stopBtn = document.getElementById('stop');
+const confirmBtn = document.getElementById('confirm');
+const discardBtn = document.getElementById('discard');
+const txDiv = document.getElementById('tx');
+const intentPre = document.getElementById('intent');
+const intentContainer = document.getElementById('intent-container');
+const statusSpan = document.getElementById('status');
+const lvlBar = document.getElementById('lvl-bar');
+const bytesSpan = document.getElementById('bytes');
+const errSpan = document.getElementById('err');
+const errorRow = document.getElementById('error-row');
+
+// Helper functions
+function wsProto() { 
+    return (location.protocol === 'https:') ? 'wss' : 'ws'; 
+}
+
+function showError(message) {
+    errSpan.textContent = message;
+    errorRow.style.display = 'flex';
+    setTimeout(() => {
+        errorRow.style.display = 'none';
+    }, 5000);
+}
+
+function clearError() {
+    errorRow.style.display = 'none';
+    errSpan.textContent = '';
+}
+
+function updateStatus(text, className = '') {
+    statusSpan.textContent = text;
+    statusSpan.className = 'badge' + (className ? ' ' + className : '');
+}
+
+function setRecordingState(recording) {
+    isRecording = recording;
+    if (recording) {
+        micBtn.disabled = true;
+        micBtn.classList.remove('success');
+        stopBtn.disabled = false;
+        stopBtn.classList.add('recording');
+        updateStatus('recording', 'recording');
+    } else {
+        micBtn.disabled = isLocked;
+        micBtn.classList.add('success');
+        stopBtn.disabled = true;
+        stopBtn.classList.remove('recording');
+        if (!isLocked) {
+            updateStatus('ready', 'connected');
+        }
+    }
+}
+
+function setLockedState(locked) {
+    isLocked = locked;
+    if (locked) {
+        // When locked, disable mic/stop and enable confirm/discard
+        micBtn.disabled = true;
+        stopBtn.disabled = true;
+        confirmBtn.disabled = false;
+        discardBtn.disabled = false;
+        updateStatus('confirm or discard', 'pending');
+    } else {
+        // When unlocked, enable mic and disable confirm/discard
+        micBtn.disabled = false;
+        stopBtn.disabled = true;
+        confirmBtn.disabled = true;
+        discardBtn.disabled = true;
+        updateStatus('ready', 'connected');
+    }
+}
+
+function resetUI() {
+    txDiv.textContent = '';
+    intentPre.textContent = '';
+    intentContainer.style.display = 'none';
+    lvlBar.style.width = '0%';
+    bytesSpan.textContent = '0 B';
+    sentBytes = 0;
+    lastSig = null;
+    clearError();
+}
+
+// Audio processing functions
+function downsampleTo16k(float32, inRate) {
+    if (inRate === 16000) return float32;
+    const ratio = inRate / 16000;
+    const newLen = Math.round(float32.length / ratio);
+    const out = new Float32Array(newLen);
+    let o = 0, i = 0;
+    while (o < newLen) {
+        const ni = Math.round((o + 1) * ratio);
+        let acc = 0, c = 0;
+        for (let j = i; j < ni && j < float32.length; j++) { 
+            acc += float32[j]; 
+            c++; 
+        }
+        out[o++] = acc / (c || 1);
+        i = ni;
+    }
+    return out;
+}
+
+function floatToInt16(float32) {
+    const out = new Int16Array(float32.length);
+    for (let i = 0; i < float32.length; i++) {
+        let s = Math.max(-1, Math.min(1, float32[i]));
+        out[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+    return out;
+}
+
+// WebSocket management
+function connectWebSocket() {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        return Promise.resolve();
+    }
+
+    return new Promise((resolve, reject) => {
+        try {
+            ws = new WebSocket(wsProto() + "://" + location.host + "/asr");
+            ws.binaryType = "arraybuffer";
+            
+            ws.onopen = () => {
+                reconnectAttempts = 0;
+                ws.send(JSON.stringify({ type: "meta", sr: 16000 }));
+                updateStatus('connected', 'connected');
+                clearError();
+                resolve();
+            };
+            
+            ws.onclose = () => {
+                updateStatus('disconnected', 'error');
+                setRecordingState(false);
+                scheduleReconnect();
+            };
+            
+            ws.onerror = (e) => {
+                updateStatus('connection error', 'error');
+                showError('WebSocket error');
+                reject(e);
+            };
+            
+            ws.onmessage = handleWSMessage;
+            
+        } catch (err) {
+            reject(err);
+        }
+    });
+}
+
+function handleWSMessage(e) {
+    try {
+        const msg = JSON.parse(e.data);
+        
+        switch(msg.type) {
+            case 'info':
+                console.log('Info:', msg.text);
+                break;
+                
+            case 'error':
+                showError(msg.text || 'Unknown error');
+                break;
+                
+            case 'rms':
+                // Update audio level meter
+                const level = Math.min(100, msg.value * 5000);
+                lvlBar.style.width = level + '%';
+                break;
+                
+            case 'bytes':
+                bytesSpan.textContent = msg.total + ' B';
+                break;
+                
+            case 'reset':
+                resetUI();
+                break;
+                
+            case 'final':
+                // Transcript received
+                txDiv.textContent = msg.text || '';
+                lastSig = msg.sig || null;
+                break;
+                
+            case 'intent':
+                // Intent parsed
+                if (msg.intent) {
+                    intentPre.textContent = JSON.stringify(msg.intent, null, 2);
+                    intentContainer.style.display = 'block';
+                    lastSig = msg.sig || lastSig;
+                }
+                break;
+                
+            case 'locked':
+                // System locked for confirmation
+                setLockedState(msg.value);
+                if (isRecording && msg.value) {
+                    // Stop recording if locked while recording
+                    stopStream();
+                }
+                break;
+                
+            case 'confirmed':
+                lastConfirmedSig = msg.sig || null;
+                updateStatus('command confirmed', 'success');
+                setTimeout(() => {
+                    resetUI();
+                    setLockedState(false);
+                }, 1500);
+                break;
+                
+            case 'discarded':
+                updateStatus('command discarded', 'warning');
+                setTimeout(() => {
+                    resetUI();
+                    setLockedState(false);
+                }, 1500);
+                break;
+                
+            case 'vad':
+                if (msg.state === 'calibrated') {
+                    console.log('VAD calibrated with gate:', msg.gate);
+                }
+                break;
+        }
+    } catch (err) {
+        console.error('Message parsing error:', err);
+    }
+}
+
+function scheduleReconnect() {
+    if (reconnectTimer) return;
+    
+    reconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
+    
+    reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connectWebSocket().catch(() => {
+            scheduleReconnect();
+        });
+    }, delay);
+}
+
+// Audio recording functions
+async function startRecording() {
+    try {
+        // Ensure WebSocket is connected
+        await connectWebSocket();
+        
+        // Get user media
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                channelCount: 1
+            }
+        });
+        
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const inSR = audioCtx.sampleRate;
+        
+        const src = audioCtx.createMediaStreamSource(mediaStream);
+        const gain = audioCtx.createGain();
+        gain.gain.value = 1.5;
+        
+        const procSize = 2048;
+        proc = audioCtx.createScriptProcessor(procSize, 1, 1);
+        
+        src.connect(gain);
+        gain.connect(proc);
+        proc.connect(audioCtx.destination);
+        
+        proc.onaudioprocess = (ev) => {
+            if (!ws || ws.readyState !== WebSocket.OPEN || isLocked) return;
+            
+            const inBuf = ev.inputBuffer.getChannelData(0);
+            const ds = downsampleTo16k(inBuf, inSR);
+            const pcm16 = floatToInt16(ds);
+            sentBytes += pcm16.byteLength;
+            
+            try {
+                ws.send(pcm16.buffer);
+            } catch (err) {
+                console.error('Failed to send audio data:', err);
+                stopStream();
+            }
+        };
+        
+        setRecordingState(true);
+        clearError();
+        
+    } catch (err) {
+        console.error('Failed to start recording:', err);
+        showError('Microphone access denied or unavailable');
+        setRecordingState(false);
+    }
+}
+
+function stopStream() {
+    // Stop audio processing
+    if (proc) {
+        try {
+            proc.disconnect();
+        } catch(e) {}
+        proc = null;
+    }
+    
+    if (audioCtx) {
+        try {
+            audioCtx.close();
+        } catch(e) {}
+        audioCtx = null;
+    }
+    
+    if (mediaStream) {
+        try {
+            mediaStream.getTracks().forEach(track => track.stop());
+        } catch(e) {}
+        mediaStream = null;
+    }
+    
+    setRecordingState(false);
+    lvlBar.style.width = '0%';
+}
+
+// Button event handlers
+micBtn.onclick = () => {
+    if (!isRecording && !isLocked) {
+        startRecording();
+    }
+};
+
+stopBtn.onclick = () => {
+    if (isRecording) {
+        stopStream();
+    }
+};
+
+confirmBtn.onclick = async () => {
+    if (isLocked) {
+        confirmBtn.disabled = true;
+        discardBtn.disabled = true;
+        
+        try {
+            const res = await fetch("/confirm", { method: "POST" });
+            const data = await res.json();
+            
+            if (data && data.ok) {
+                if (data.duplicate) {
+                    updateStatus('already confirmed', 'warning');
+                } else {
+                    updateStatus('command confirmed', 'success');
+                }
+                
+                setTimeout(() => {
+                    resetUI();
+                    setLockedState(false);
+                }, 1500);
+            }
+        } catch (err) {
+            showError('Failed to confirm command');
+            confirmBtn.disabled = false;
+            discardBtn.disabled = false;
+        }
+    }
+};
+
+discardBtn.onclick = async () => {
+    if (isLocked) {
+        confirmBtn.disabled = true;
+        discardBtn.disabled = true;
+        
+        try {
+            const res = await fetch("/discard", { method: "POST" });
+            const data = await res.json();
+            
+            if (data && data.ok) {
+                updateStatus('command discarded', 'warning');
+                
+                setTimeout(() => {
+                    resetUI();
+                    setLockedState(false);
+                }, 1500);
+            }
+        } catch (err) {
+            showError('Failed to discard command');
+            confirmBtn.disabled = false;
+            discardBtn.disabled = false;
+        }
+    }
+};
+
+// Push-to-talk with Spacebar
+let spaceDown = false;
+
+document.addEventListener("keydown", (e) => {
+    if (e.code === "Space" && !spaceDown && !isLocked) {
+        spaceDown = true;
+        e.preventDefault();
+        if (!isRecording) {
+            startRecording();
+        }
+    }
+});
+
+document.addEventListener("keyup", (e) => {
+    if (e.code === "Space") {
+        spaceDown = false;
+        e.preventDefault();
+        if (isRecording) {
+            stopStream();
+        }
+    }
+});
+
+// Initialize connection on page load
+window.addEventListener('load', () => {
+    connectWebSocket().catch(err => {
+        showError('Failed to connect to server');
+    });
+});
+
+// Clean up on page unload
+window.addEventListener('beforeunload', () => {
+    if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+    }
+    stopStream();
+    if (ws) {
+        ws.close();
+    }
+});
+</script>
+</body>
+</html>
