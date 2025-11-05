@@ -1,0 +1,15 @@
+# HMI Voice Control Server - Python Dependencies
+
+# Web Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# WebSocket Support
+websockets==12.0
+
+# OpenAI Integration - Updated version
+openai>=1.12.0
+
+# Note: rclpy must be installed separately from ROS2
+# The code will work without it (graceful degradation)

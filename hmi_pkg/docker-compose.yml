@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  hmi-server:
+    build: 
+      context: .  # Build from hmi_pkg directory
+      dockerfile: Dockerfile
+    container_name: hmi-voice-control
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ASR_ENGINE=openai_whisper
+      - WHISPER_MODEL=whisper-1
+      - WHISPER_LANG=en
+      - HMI_ROS_ENABLE=0
+      - LOCK_ON_INTENT=1
+    restart: unless-stopped
+    networks:
+      - hmi-network
+
+networks:
+  hmi-network:
+    driver: bridge
