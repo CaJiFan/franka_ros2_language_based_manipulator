@@ -1,0 +1,37 @@
+{
+  "version": "1.1",
+  "actions": ["pick", "release", "next", "stop", "cancel"],
+  "objects": ["cup", "bottle", "mug", "can"],
+  "standalone_actions": ["stop", "next", "cancel"],
+  "object_required_actions": ["pick", "release"],
+  "synonyms": {
+    "actions": {
+      "pick": ["pick up", "grab", "take", "get", "hold", "lift"],
+      "release": ["drop", "let go", "open gripper", "drop it", "put down", "place"],
+      "next": ["next one", "grab next", "take next", "continue", "proceed"],
+      "stop": ["halt", "freeze", "pause", "wait", "hold on"],
+      "cancel": ["undo", "abort", "never mind", "nevermind", "forget it", "skip"]
+    },
+    "objects": {
+      "cup": ["glass", "tumbler"],
+      "bottle": ["flask", "container"],
+      "mug": ["coffee cup", "tea cup"],
+      "can": ["tin", "aluminum can", "soda can"]
+    }
+  },
+  "phonetic_corrections": {
+    "actions": {
+      "pick": ["peak", "pig", "peek", "pik", "pic", "beak"],
+      "cancel": ["council", "cancell", "cansel", "cancle"],
+      "release": ["releaze", "relese", "relees", "reliefs"],
+      "stop": ["top", "spot", "stock"],
+      "next": ["necks", "nest", "text"]
+    },
+    "objects": {
+      "can": ["ken", "kahn", "cann"],
+      "cup": ["cub", "cop", "cupp"],
+      "mug": ["mag", "mugg", "maug"],
+      "bottle": ["modal", "bottel", "bottled"]
+    }
+  }
+}
