@@ -1,0 +1,24 @@
+<package format="2">
+  <name>vision_module</name>
+  <version>0.0.1</version>
+  <description>The vision module for object detection using YOLO.</description>
+  <maintainer email="your_email@example.com">Your Name</maintainer>
+  <license>MIT</license>
+  <buildtool>ament_cmake</buildtool>
+  
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>cv_bridge</depend>
+  <depend>image_transport</depend>
+  <depend>numpy</depend>
+  
+  <exec_depend>opencv-python</exec_depend>
+  <exec_depend>torch</exec_depend>
+  <exec_depend>torchvision</exec_depend>
+  
+  <test_depend>pytest</test_depend>
+  
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
