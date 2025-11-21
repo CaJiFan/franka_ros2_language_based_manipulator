@@ -1,29 +1,26 @@
-from setuptools import setup
+from pathlib import Path
+from setuptools import setup, find_packages
 
-package_name = 'vision_module'
+# read long_description / requirements if you want
+this_dir = Path(__file__).parent
+requirements = []
+req_file = this_dir / 'requirements.txt'
+if req_file.exists():
+    requirements = [r.strip() for r in req_file.read_text().splitlines() if r.strip() and not r.startswith('#')]
 
 setup(
-    name=package_name,
-    version='0.0.1',
-    packages=[package_name],
-    install_requires=[
-        'setuptools',
-        'opencv-python',
-        'torch',
-        'torchvision',
-        'numpy',
-        'rclpy',
-        'sensor_msgs',
-    ],
-    zip_safe=True,
-    maintainer='Your Name',
-    maintainer_email='your.email@example.com',
-    description='A ROS 2 package for object detection using YOLO.',
-    license='MIT',
-    tests_require=['pytest'],
+    name='vision_module',
+    version='0.0.0',
+    packages=find_packages('src'),
+    package_dir={'': 'src'},
+    include_package_data=True,
+    install_requires=requirements,
+    zip_safe=False,
+    # Provide a console entrypoint if you want ros2 run to work.
+    # Replace vision_module.vision_node:main with the actual callable in your vision_node.py
     entry_points={
         'console_scripts': [
-            'vision_node = vision_module.vision_node:main',
+            'vision_node = vision_module.vision_node:main'
         ],
     },
 )
