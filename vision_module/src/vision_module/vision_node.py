@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
+from cv_bridge import CvBridge, CvBridgeError
 from vision_module.yolo_detector import YoloDetector
 from vision_module.publishers.object_publisher import ObjectPublisher
 
@@ -9,10 +10,12 @@ class VisionNode(Node):
         super().__init__('vision_node')
         self.yolo_detector = YoloDetector()
         self.object_publisher = ObjectPublisher(self)
-        
+        self.bridge = CvBridge()
+
+        # subscribe to 'input/image' to match launch remapping in launch file
         self.subscription = self.create_subscription(
             Image,
-            'image_input',
+            'input/image',
             self.image_callback,
             10
         )
@@ -20,13 +23,18 @@ class VisionNode(Node):
 
     def image_callback(self, msg):
         image = self.convert_image(msg)
+        if image is None:
+            return
         detected_objects = self.yolo_detector.detect_objects(image)
         self.object_publisher.publish(detected_objects)
 
     def convert_image(self, msg):
-        # Convert the ROS Image message to a format suitable for YOLO
-        # This function should handle the conversion logic
-        pass
+        try:
+            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            return cv_image
+        except CvBridgeError as e:
+            self.get_logger().error(f'Failed to convert image: {e}')
+            return None
 
 def main(args=None):
     rclpy.init(args=args)
