@@ -36,12 +36,17 @@ class VisionNode(Node):
             self.get_logger().error(f'Failed to convert image: {e}')
             return None
 
-def main(args=None):
-    rclpy.init(args=args)
-    vision_node = VisionNode()
-    rclpy.spin(vision_node)
-    vision_node.destroy_node()
-    rclpy.shutdown()
+def main(argv=None):
+    rclpy.init(args=argv)
+    try:
+        node = VisionNode()
+        rclpy.spin(node)
+    finally:
+        try:
+            node.destroy_node()
+        except Exception:
+            pass
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

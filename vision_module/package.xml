@@ -5,8 +5,8 @@
   <maintainer email="you@example.com">you</maintainer>
   <license>MIT</license>
 
-  <!-- buildtool and runtime dependencies -->
-  <buildtool_depend>ament_cmake</buildtool_depend>
+  <!-- correct buildtool for ament_python packages -->
+  <buildtool_depend>ament_python</buildtool_depend>
 
   <depend>rclpy</depend>
   <depend>sensor_msgs</depend>
