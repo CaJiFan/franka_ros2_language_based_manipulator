@@ -20,6 +20,8 @@ class YOLODetectorUltralytics:
         self.model_name = model_name
         self.confidence_threshold = confidence_threshold
         self.model = None
+        self.class_names = ['toy','bottle','fork','spoon','knife','bowl','cup','plate']
+        self.model.set_classes(self.class_names, self.model.get_text_pe(self.class_names))
         self.load_model()
 
     def load_model(self, model_name=None):

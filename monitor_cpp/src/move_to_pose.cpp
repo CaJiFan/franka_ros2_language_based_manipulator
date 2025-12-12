@@ -153,7 +153,7 @@ bool move_cartesian(moveit::planning_interface::MoveGroupInterface& move_group,
     }
 }
 
-int main(int argc, char * argv[])
+int old_main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
   auto node = std::make_shared<rclcpp::Node>("move_to_pose_node");
@@ -187,7 +187,7 @@ int main(int argc, char * argv[])
   bool do_grasp = node->get_parameter("grasp").as_bool();
 
   auto target_pose = create_pose(tx, ty, tz, tr, tp, tyw);
-  auto intermediate_pose = create_pose(0.467, -0.139, 0.362, -172.5, -3.5, -53.2);
+  auto intermediate_pose = create_pose(0.467, -0.139, 0.382, -172.5, -3.5, -53.2);
   auto release_pose = create_pose(0.598, -0.485, 0.222, -169.2, -4.1, -143.5);
 
   // --- Initialize MoveGroup ---
@@ -255,3 +255,120 @@ int main(int argc, char * argv[])
   spinner.join();
   return 0;
 }
+
+
+int main(int argc, char * argv[]) {
+    rclcpp::init(argc, argv);
+    auto node = std::make_shared<rclcpp::Node>("move_to_pose_node");
+
+    // Spin in background
+    std::thread spinner([&node]() {
+        rclcpp::spin(node);
+    });
+
+    // --- CONFIGURATION ---
+    node->declare_parameter<bool>("grasp", true); 
+    bool do_grasp = node->get_parameter("grasp").as_bool();
+
+    // --- 1. DEFINE YOUR 3 TARGETS (Position + Orientation) ---
+    struct DemoTarget {
+        double x, y, z;       // Position (meters)
+        double r, p, yw;      // Orientation (degrees)
+        std::string name;     // Label for logs
+    };
+
+    // EDIT YOUR COORDINATES HERE:
+    std::vector<DemoTarget> targets = {
+        // {0.541, -0.086, 0.181, -167.4, 4.7, -50.9,   "Object 1: Toy"},
+        {0.568, -0.060, 0.087, 174.2, 1.5, -44.1,   "Object 1: spoon"},
+        
+        {0.285, 0.271, 0.081, -179.2, 1.3, 4.2,   "Object 2: Fork"},
+        
+        {0.682, 0.169, 0.223, -175.7, -8.6, 40.0,   "Object 3: Bottle"}
+    };
+
+    // Fixed Drop/Intermediate Poses (You can change these too if needed)
+    // auto intermediate_pose = create_pose(0.467, -0.139, 0.382, -172.5, -3.5, -53.2);
+    // auto release_pose = create_pose(0.598, -0.485, 0.222, -169.2, -4.1, -143.5);
+
+    // --- SETUP MOVEIT ---
+    static const std::string PLANNING_GROUP = "fr3_arm"; 
+    moveit::planning_interface::MoveGroupInterface move_group(node, PLANNING_GROUP);
+    move_group.setMaxVelocityScalingFactor(0.1); 
+    move_group.setMaxAccelerationScalingFactor(0.1);
+
+    // --- START LOOP ---
+    RCLCPP_INFO(node->get_logger(), ">>> STARTING 3-OBJECT DEMO SEQUENCE <<<");
+
+    if (do_grasp) {
+        open_gripper(node);
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+
+    // Iterate through the list
+    for (const auto& target : targets) {
+        
+        RCLCPP_INFO(node->get_logger(), "\n--- PROCESSING: %s ---", target.name.c_str());
+
+        // 1. Create Pose using the SPECIFIC orientation for this target
+        auto target_pose = create_pose(target.x, target.y, target.z, target.r, target.p, target.yw);
+
+        // 2. Intermediate Pose (Inherits Orientation)
+        geometry_msgs::msg::Pose intermediate_pose = target_pose; 
+        intermediate_pose.position.x = 0.467;
+        intermediate_pose.position.y = -0.139;
+        intermediate_pose.position.z = 0.402;
+
+        // 3. Release Pose (Inherits Orientation)
+        geometry_msgs::msg::Pose release_pose = target_pose;
+        release_pose.position.x = 0.598;
+        release_pose.position.y = -0.485;
+        release_pose.position.z = 0.222;
+
+        if (move_cartesian(move_group, intermediate_pose, node, "Move to Intermediate")) {
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+            
+            // 2. Move to Target
+            if (move_cartesian(move_group, target_pose, node, "Move to Pick")) {
+                
+                // 3. Grasp
+                if (do_grasp) {
+                    std::this_thread::sleep_for(std::chrono::seconds(2));
+                    grasp_object(node);
+                    std::this_thread::sleep_for(std::chrono::seconds(2));
+                }
+
+                // 4. Move to Intermediate
+                if (move_cartesian(move_group, intermediate_pose, node, "Move to Intermediate")) {
+                    std::this_thread::sleep_for(std::chrono::seconds(2));
+                    // 5. Move to Release
+                    if (move_cartesian(move_group, release_pose, node, "Move to Release")) {
+                        
+                        // 6. Release
+                        if (do_grasp) {
+                            RCLCPP_INFO(node->get_logger(), "Dropping object...");
+                            std::this_thread::sleep_for(std::chrono::seconds(3));
+                            open_gripper(node);
+                            std::this_thread::sleep_for(std::chrono::seconds(1));
+                        }
+                    }
+                }
+            } else {
+                RCLCPP_ERROR(node->get_logger(), "Failed to reach %s. Skipping...", target.name.c_str());
+            }
+
+        }
+        // Small pause before next object
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+
+    // Return to Home at the very end
+    RCLCPP_INFO(node->get_logger(), "Sequence Finished. Going Home.");
+    move_group.setNamedTarget("ready");
+    move_group.move();
+
+    rclcpp::shutdown();
+    spinner.join();
+    return 0;
+}
+
