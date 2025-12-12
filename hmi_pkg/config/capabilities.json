@@ -1,8 +1,8 @@
 {
   "version": "1.1",
   "actions": ["pick", "release", "next", "stop", "cancel"],
-  "objects": ["cup", "bottle", "mug", "can"],
-  "standalone_actions": ["stop", "next", "cancel"],
+  "objects": ["cup", "bottle", "mug", "can", "item"],
+  "standalone_actions": ["stop", "next", "cancel","release"],
   "object_required_actions": ["pick", "release"],
   "synonyms": {
     "actions": {
@@ -16,7 +16,8 @@
       "cup": ["glass", "tumbler"],
       "bottle": ["flask", "container"],
       "mug": ["coffee cup", "tea cup"],
-      "can": ["tin", "aluminum can", "soda can"]
+      "can": ["tin", "aluminum can", "soda can"],
+      "item": ["object", "thing", "stuff"] 
     }
   },
   "phonetic_corrections": {
@@ -31,7 +32,8 @@
       "can": ["ken", "kahn", "cann"],
       "cup": ["cub", "cop", "cupp"],
       "mug": ["mag", "mugg", "maug"],
-      "bottle": ["modal", "bottel", "bottled"]
+      "bottle": ["modal", "bottel", "bottled"],
+      "item": ["i tem", "it em", "aitem"]
     }
   }
 }
