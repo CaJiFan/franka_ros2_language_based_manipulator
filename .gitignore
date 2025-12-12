@@ -1,6 +1,8 @@
 devel/
 logs/
 build/
+install/
+log/
 bin/
 lib/
 msg_gen/
@@ -54,3 +56,8 @@ install/
 log/
 __pycache__/
 *.pyc
+
+*/build
+*/install
+*/log
+

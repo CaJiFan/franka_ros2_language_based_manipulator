@@ -1,0 +1,12 @@
+model:
+  path: "path/to/yolo/model.weights"
+  config: "path/to/yolo/model.cfg"
+  classes: "path/to/yolo/classes.names"
+
+input:
+  image_size: [416, 416]
+  confidence_threshold: 0.5
+  nms_threshold: 0.4
+
+output:
+  topic: "detected_objects"
