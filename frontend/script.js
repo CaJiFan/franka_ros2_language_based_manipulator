@@ -193,6 +193,63 @@ document.addEventListener('DOMContentLoaded', () => {
         alert(`Dum-E Sequence Started!\n\nExecuting ${sortedSequence.length} steps.\nCheck console for details.`);
     });
 
+    // --- Audio Recording ---
+    const recordBtn = document.getElementById('record-btn');
+    const stopRecordBtn = document.getElementById('stop-record-btn');
+    const recordingStatus = document.getElementById('recording-status');
+    const audioPlayback = document.getElementById('audio-playback');
+
+    let mediaRecorder;
+    let audioChunks = [];
+    let audioBlob = null;
+
+    if (recordBtn && stopRecordBtn) {
+        recordBtn.addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.addEventListener('dataavailable', event => {
+                    audioChunks.push(event.data);
+                });
+
+                mediaRecorder.addEventListener('stop', () => {
+                    // Create blob from chunks
+                    audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    
+                    // Setup playback
+                    audioPlayback.src = audioUrl;
+                    audioPlayback.style.display = 'block';
+                    recordingStatus.textContent = 'Recording finished. Ready to play.';
+                    
+                    // Stop all tracks to release microphone
+                    stream.getTracks().forEach(track => track.stop());
+                    
+                    console.log("Audio recording stored in 'audioBlob' variable.");
+                });
+
+                mediaRecorder.start();
+                recordBtn.disabled = true;
+                stopRecordBtn.disabled = false;
+                recordingStatus.textContent = 'Recording...';
+                audioPlayback.style.display = 'none';
+            } catch (err) {
+                console.error('Error accessing microphone:', err);
+                recordingStatus.textContent = 'Error accessing microphone: ' + err.message;
+            }
+        });
+
+        stopRecordBtn.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                recordBtn.disabled = false;
+                stopRecordBtn.disabled = true;
+            }
+        });
+    }
+
     // --- File I/O ---
     function updateConfigPreview() {
         const config = {

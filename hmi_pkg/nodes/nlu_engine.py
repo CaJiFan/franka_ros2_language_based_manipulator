@@ -69,7 +69,7 @@ class NLU:
     syn_obj: Dict[str, str]
     act_aliases: Dict[str, Set[str]]
     obj_aliases: Dict[str, Set[str]]
-    deny_action_tokens: Set[str] = field(default_factory=lambda: {"please","pls","plz"})
+    deny_action_tokens: Set[str] = (default_factory=lambda: {"please","pls","plz"})
     ACTION_PHONETIC_THRESHOLD: float = 0.65
     OBJECT_PHONETIC_THRESHOLD: float = 0.70
 
