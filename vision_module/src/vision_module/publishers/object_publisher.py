@@ -17,4 +17,4 @@ class ObjectPublisher:
         except Exception:
             msg.data = str(object_info)
         self._publisher.publish(msg)
-        self._node.get_logger().info(f'Published: {msg.data}')
+        # self._node.get_logger().info(f'Published: {msg.data}')
