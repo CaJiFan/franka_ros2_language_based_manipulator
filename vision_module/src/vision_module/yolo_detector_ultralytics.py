@@ -8,11 +8,7 @@ class YOLODetectorUltralytics:
     Compatible with the original YoloDetector interface.
     """
 
-<<<<<<< Updated upstream
-    def __init__(self, model_name="yoloe-11m-seg.pt", confidence_threshold=0.5):
-=======
     def __init__(self, model_name="yolov8l-worldv2.pt", class_names=None, confidence_threshold=0.5):
->>>>>>> Stashed changes
         """
         Initialize the YOLO detector with ultralytics.
 
@@ -28,12 +24,9 @@ class YOLODetectorUltralytics:
         self.class_names = ['toy','bottle','fork','spoon','knife','bowl','cup','plate']
         self.model.set_classes(self.class_names, self.model.get_text_pe(self.class_names))
         self.load_model()
-<<<<<<< Updated upstream
-=======
         print(f"Loaded classes: {self.class_names}")
         # self.model.set_classes(self.class_names, self.model.get_text_pe(self.class_names))
         self.model.set_classes(self.class_names)
->>>>>>> Stashed changes
 
     def load_model(self, model_name=None):
         """

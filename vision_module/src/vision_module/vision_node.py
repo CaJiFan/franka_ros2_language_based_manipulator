@@ -4,11 +4,10 @@ from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
 import json
-<<<<<<< Updated upstream
-=======
+import os
+from ament_index_python.packages import get_package_share_directory
 import cv2
 import cv2.aruco as aruco
->>>>>>> Stashed changes
 from std_msgs.msg import String
 from vision_module.yolo_detector_ultralytics import YOLODetectorUltralytics as YoloDetector
 from vision_module.publishers.object_publisher import ObjectPublisher
@@ -17,7 +16,29 @@ from vision_module.publishers.object_publisher import ObjectPublisher
 class VisionNode(Node):
     def __init__(self):
         super().__init__('vision_node')
-        self.class_names = [ 'bottle', 'fork', 'spoon']
+        
+        # Load tools from JSON file
+        # The folder is defined here: share/vision_module/config/tools.json
+        try:
+            package_share_directory = get_package_share_directory('vision_module')
+            config_file_path = os.path.join(package_share_directory, 'config', 'tools.json')
+            
+            with open(config_file_path, 'r') as f:
+                config_data = json.load(f)
+                # Support both list (old format) and dict (new format)
+                if isinstance(config_data, list):
+                    self.class_names = config_data
+                elif isinstance(config_data, dict) and 'tools' in config_data:
+                    self.class_names = config_data['tools']
+                else:
+                    self.get_logger().warn(f"Invalid JSON format in {config_file_path}. Expected list or dict with 'tools' key.")
+                    self.class_names = ['bottle', 'fork', 'spoon']
+            
+            self.get_logger().info(f'Loaded tools from {config_file_path}: {self.class_names}')
+        except Exception as e:
+            self.get_logger().error(f'Error loading config from {config_file_path if "config_file_path" in locals() else "unknown"}: {e}. Using defaults.')
+            self.class_names = [ 'bottle', 'fork', 'spoon']
+
         self.yolo_detector = YoloDetector(self.class_names)
         self.bridge = CvBridge()
 
@@ -77,23 +98,6 @@ class VisionNode(Node):
         debug_image = cv_image.copy()
         
         for obj in detections:
-<<<<<<< Updated upstream
-            # Draw Box
-            box = obj['box'] # [x1, y1, x2, y2]
-            x1, y1, x2, y2 = int(box[0]), int(box[1]), int(box[2]), int(box[3])
-            cv2.rectangle(debug_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            
-            # Draw Label
-            label = f"{obj['label']}"
-            cv2.putText(debug_image, label, (x1, y1 - 10), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-            # ... (Existing 3D calculation logic) ...
-            
-            # (Optional) Add coordinate text to the image
-            # label += f" ({x_robot:.2f}, {y_robot:.2f})"
-        
-=======
             label_id = obj['label']
             # Get bounding box (cx, cy, w, h) -> corners
             cx, cy, w, h = obj['position']
@@ -198,7 +202,6 @@ class VisionNode(Node):
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
 
->>>>>>> Stashed changes
         # --- PUBLISH DEBUG IMAGE ---
         try:
             ros_image = self.bridge.cv2_to_imgmsg(debug_image, "bgr8")
@@ -206,7 +209,11 @@ class VisionNode(Node):
         except CvBridgeError:
             pass
         
-        # ... (Existing JSON publishing logic) ...
+        # Filter for ArUco detections and publish only IDs
+        aruco_detections = [res for res in results_3d if res['method'] == 'ARUCO']
+        # Publish only the ID (read aruco value)
+        published_data = [{"id": d['id']} for d in aruco_detections]
+        self.object_publisher.publish(published_data)
 
     def transform_to_robot(self, x_cam, y_cam, z_cam):
         # HYPOTHESIS:

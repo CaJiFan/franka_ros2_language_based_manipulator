@@ -10,9 +10,11 @@
 
   <depend>rclpy</depend>
   <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
   <depend>cv_bridge</depend>
   <depend>image_transport</depend>
   <depend>numpy</depend>
+  <depend>ament_index_python</depend>
 
   <exec_depend>opencv-python</exec_depend>
   <exec_depend>torch</exec_depend>

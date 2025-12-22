@@ -1,0 +1,27 @@
+{
+  "project": "Dum-E",
+  "tools": [
+    "fork",
+    "spoon",
+    "toy",
+    "bottle"
+  ],
+  "sequence": [
+    {
+      "tool": "fork",
+      "startTime": 0
+    },
+    {
+      "tool": "spoon",
+      "startTime": 10
+    },
+    {
+      "tool": "bottle",
+      "startTime": 20
+    },
+    {
+      "tool": "toy",
+      "startTime": 30
+    }
+  ]
+}

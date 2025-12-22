@@ -16,9 +16,12 @@ data_files = [
 launch_file = this_dir / 'launch' / 'vision_launch.py'
 if launch_file.exists():
     data_files.append(('share/vision_module/launch', [str((launch_file.relative_to(this_dir)).as_posix())]))
-config_file = this_dir / 'config' / 'yolo.yaml'
-if config_file.exists():
-    data_files.append(('share/vision_module/config', [str((config_file.relative_to(this_dir)).as_posix())]))
+
+config_dir = this_dir / 'config'
+if config_dir.exists():
+    config_files = [str(p.relative_to(this_dir).as_posix()) for p in config_dir.glob('*') if p.is_file()]
+    if config_files:
+        data_files.append(('share/vision_module/config', config_files))
 # include entire resource dir if exists
 resource_dir = this_dir / 'resource'
 if resource_dir.exists():
