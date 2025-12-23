@@ -5,7 +5,7 @@ from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
 import json
 import os
-from ament_index_python.packages import get_package_share_directory
+# from ament_index_python.packages import get_package_share_directory
 import cv2
 import cv2.aruco as aruco
 from std_msgs.msg import String
@@ -20,8 +20,10 @@ class VisionNode(Node):
         # Load tools from JSON file
         # The folder is defined here: share/vision_module/config/tools.json
         try:
-            package_share_directory = get_package_share_directory('vision_module')
-            config_file_path = os.path.join(package_share_directory, 'config', 'tools.json')
+            # package_share_directory = get_package_share_directory('vision_module')
+            # config_file_path = os.path.join(package_share_directory, 'shared', 'sequence.json')
+            package_share_directory = "/home/userlab/cjimenez/franka_ros2_language_based_manipulator"
+            config_file_path = os.path.join(package_share_directory, 'shared', 'sequence.json')
             
             with open(config_file_path, 'r') as f:
                 config_data = json.load(f)
@@ -39,17 +41,17 @@ class VisionNode(Node):
             self.get_logger().error(f'Error loading config from {config_file_path if "config_file_path" in locals() else "unknown"}: {e}. Using defaults.')
             self.class_names = [ 'bottle', 'fork', 'spoon']
 
-        self.yolo_detector = YoloDetector(self.class_names)
+        self.yolo_detector = YoloDetector(class_names=self.class_names)
         self.bridge = CvBridge()
 
         # 1. CAMERA INTRINSICS (Lens parameters)
         self.intrinsics = None
-        self.create_subscription(CameraInfo, '/camera/color/camera_info', self.info_callback, 10)
+        self.create_subscription(CameraInfo, '/camera/camera/color/camera_info', self.info_callback, 10)
 
         # 2. SUBSCRIBERS (RGB and Depth)
         # Note: In RealSense, use the "aligned_depth_to_color" topic!
-        self.create_subscription(Image, '/camera/color/image_raw', self.image_callback, 10)
-        self.create_subscription(Image, '/camera/aligned_depth_to_color/image_raw', self.depth_callback, 10)
+        self.create_subscription(Image, '/camera/camera/color/image_raw', self.image_callback, 10)
+        self.create_subscription(Image, '/camera/camera/aligned_depth_to_color/image_raw', self.depth_callback, 10)
         
         self.object_publisher = ObjectPublisher(self)
         self.debug_publisher = self.create_publisher(Image, 'debug_image', 10)
@@ -167,7 +169,7 @@ class VisionNode(Node):
                     raw_text = f"Cam: ({x_cam:.2f}, {y_cam:.2f}, {z_cam:.2f})"
                     
                     # Draw text slightly above the marker box
-                    cv2.putText(debug_image, raw_text, (x1, y1 - 30), 
+                    cv2.putText(debug_image, raw_text, (x1, y1 - 50), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
                 
                 # --- OPTION B: Use ArUco Pose Estimation (More Precise Rotation) ---
@@ -184,7 +186,7 @@ class VisionNode(Node):
             if z_cam > 0:
                 x_robot, y_robot, z_robot = self.transform_to_robot(x_cam, y_cam, z_cam)
                 rob_text = f"Rob: ({x_robot:.2f}, {y_robot:.2f}, {z_robot:.2f})"
-                cv2.putText(debug_image, rob_text, (x1, y1 - 15), 
+                cv2.putText(debug_image, rob_text, (x1, y1 - 30), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2) # Cyan color, slightly bigger
                 
                 # Add to results
@@ -211,8 +213,7 @@ class VisionNode(Node):
         
         # Filter for ArUco detections and publish only IDs
         aruco_detections = [res for res in results_3d if res['method'] == 'ARUCO']
-        # Publish only the ID (read aruco value)
-        published_data = [{"id": d['id']} for d in aruco_detections]
+        published_data = [{"label": d['label'], 'x': d['x'], 'y': d['y'], 'z': d['z']} for d in aruco_detections]
         self.object_publisher.publish(published_data)
 
     def transform_to_robot(self, x_cam, y_cam, z_cam):
@@ -232,9 +233,9 @@ class VisionNode(Node):
         # 0.060 = (-0.10) + Y_offset   -> Y_offset = 0.160
         # 0.196 = -(0.48) + Z_offset   -> Z_offset = 0.676
         
-        cam_x_offset = 0.424
-        cam_y_offset = 0.160
-        cam_z_offset = 0.676
+        cam_x_offset = 0.430
+        cam_y_offset = -0.07
+        cam_z_offset = 0.735
 
         x_final = x_rot + cam_x_offset
         y_final = y_rot + cam_y_offset

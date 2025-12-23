@@ -1,5 +1,9 @@
 from pathlib import Path
 from setuptools import setup, find_packages
+import os
+from glob import glob
+
+package_name = 'vision_module'
 
 this_dir = Path(__file__).parent
 requirements = []
@@ -10,12 +14,10 @@ if req_file.exists():
 # list package data to install into share/<package>
 data_files = [
     ('share/vision_module', ['package.xml']),
+    (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
+    ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
 ]
 
-# add launch/config/resource files if present (paths MUST be relative to setup.py)
-launch_file = this_dir / 'launch' / 'vision_launch.py'
-if launch_file.exists():
-    data_files.append(('share/vision_module/launch', [str((launch_file.relative_to(this_dir)).as_posix())]))
 
 config_dir = this_dir / 'config'
 if config_dir.exists():
@@ -30,7 +32,7 @@ if resource_dir.exists():
         data_files.append(('share/vision_module/resource', resource_files))
 
 setup(
-    name='vision_module',
+    name=package_name,
     version='0.0.0',
     packages=find_packages('src'),
     package_dir={'': 'src'},

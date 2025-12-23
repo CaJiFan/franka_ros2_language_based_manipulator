@@ -23,7 +23,7 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
-find_package(nlohmann_json REQUIRED)
+# find_package(nlohmann_json REQUIRED)
 
 # Create the executable
 add_executable(pose_monitor src/pose_monitor.cpp)
@@ -55,7 +55,7 @@ ament_target_dependencies(move_to_pose
   std_msgs
 )
 
-target_link_libraries(move_to_pose_node nlohmann_json::nlohmann_json)
+# target_link_libraries(move_to_pose nlohmann_json::nlohmann_json)
 
 install(TARGETS
   move_to_pose

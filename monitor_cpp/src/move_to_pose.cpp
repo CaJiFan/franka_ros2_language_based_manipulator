@@ -82,7 +82,105 @@ geometry_msgs::msg::Pose create_pose(double x, double y, double z, double r, dou
 }
 
 // ... [Keep your open_gripper and grasp_object functions exactly as they were] ...
-// (Omitting them here for brevity, but paste them back in!)
+ // void open_gripper(rclcpp::Node::SharedPtr node) {
+    // using MoveAction = franka_msgs::action::Move;
+    // auto action_client = rclcpp_action::create_client<MoveAction>(node, "/franka_gripper/move");
+    // if (!action_client->wait_for_action_server(std::chrono::seconds(2))) return;
+
+    // auto goal = MoveAction::Goal();
+    // goal.width = 0.08;
+    // goal.speed = 0.1
+    // action_client->async_send_goal(goal);
+
+// }
+
+
+void open_gripper(rclcpp::Node::SharedPtr node) {
+    using MoveAction = franka_msgs::action::Move;
+    using GoalHandleMove = rclcpp_action::ClientGoalHandle<MoveAction>;
+
+    auto action_client = rclcpp_action::create_client<MoveAction>(node, "/franka_gripper/move");
+
+    if (!action_client->wait_for_action_server(std::chrono::seconds(5))) {
+        RCLCPP_ERROR(node->get_logger(), "Gripper Action Server not available!");
+        return;
+
+    }
+
+    auto goal = MoveAction::Goal();
+    goal.width = 0.08; // Max width
+    goal.speed = 0.1;
+
+    // --- SETUP BLOCKING WAIT ---
+    // We use a promise to signal when the action is completely done
+    auto result_promise = std::make_shared<std::promise<void>>();
+    auto result_future = result_promise->get_future();
+
+    auto send_goal_options = rclcpp_action::Client<MoveAction>::SendGoalOptions();
+
+    // Callback: This triggers when the robot says "I am finished moving"
+    send_goal_options.result_callback = [result_promise, node](const GoalHandleMove::WrappedResult & result) {
+
+        if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
+            RCLCPP_INFO(node->get_logger(), "Gripper Opened Successfully.");
+        } else {
+            RCLCPP_WARN(node->get_logger(), "Gripper Open Failed or Cancelled.");
+        }
+
+        // Unblock the main thread
+        result_promise->set_value();
+
+    };
+
+    // Send the goal
+    RCLCPP_INFO(node->get_logger(), "ACTION: Opening Gripper (Waiting for completion)...");
+    action_client->async_send_goal(goal, send_goal_options);
+
+    // WAIT HERE until the callback above fires
+    // This keeps 'action_client' alive while the robot moves
+    result_future.wait();
+
+}
+
+void grasp_object(rclcpp::Node::SharedPtr node) {
+    using GraspAction = franka_msgs::action::Grasp;
+    using GoalHandleGrasp = rclcpp_action::ClientGoalHandle<GraspAction>;
+
+    auto action_client = rclcpp_action::create_client<GraspAction>(node, "/franka_gripper/grasp");
+
+    if (!action_client->wait_for_action_server(std::chrono::seconds(5))) return;
+
+    auto goal = GraspAction::Goal();
+    goal.width = 0.04;
+    goal.speed = 0.1;
+    goal.force = 40.0;
+    goal.epsilon.inner = 0.05;
+    goal.epsilon.outer = 0.05;
+
+    // --- BLOCKING SETUP ---
+    auto result_promise = std::make_shared<std::promise<void>>();
+    auto result_future = result_promise->get_future();
+    auto options = rclcpp_action::Client<GraspAction>::SendGoalOptions();
+
+    options.result_callback = [result_promise, node](const GoalHandleGrasp::WrappedResult & result) {
+
+        if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
+            RCLCPP_INFO(node->get_logger(), "Grasp Successful.");
+        } else {
+            RCLCPP_WARN(node->get_logger(), "Grasp Failed.");
+        }
+
+        result_promise->set_value();
+
+    };
+
+    RCLCPP_INFO(node->get_logger(), "ACTION: Grasping (Waiting)...");
+    action_client->async_send_goal(goal, options);
+
+    // Wait for finish
+    result_future.wait();
+
+} 
 
 // --- HELPER: Execute Cartesian Path (Keep as is) ---
 bool move_cartesian(moveit::planning_interface::MoveGroupInterface& move_group, 
@@ -112,8 +210,6 @@ void vision_callback(const std_msgs::msg::String::SharedPtr msg) {
         auto data = json::parse(msg->data);
         std::lock_guard<std::mutex> lock(memory_mutex);
 
-        // Expecting list of detected objects from Python node
-        // Format: [{"label": "bottle", "x": 0.5, "y": 0.1, "z": 0.2}, ...]
         if (data.is_array()) {
             for (const auto& item : data) {
                 std::string label = item["label"];
@@ -148,7 +244,7 @@ void intent_callback(const std_msgs::msg::String::SharedPtr msg) {
 
 int main(int argc, char * argv[]) {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<rclcpp::Node>("move_to_pose_node");
+    auto node = std::make_shared<rclcpp::Node>("move_to_pose");
 
     rclcpp::executors::MultiThreadedExecutor executor;
     executor.add_node(node);
@@ -156,12 +252,12 @@ int main(int argc, char * argv[]) {
 
     // --- PARAMETERS ---
     // Default path to your JSON file (Update this path!)
-    node->declare_parameter<std::string>("mission_file", "/home/userlab/cjimenez/project_files/dum_e.json");
+    node->declare_parameter<std::string>("mission_file", "/home/userlab/cjimenez/franka_ros2_language_based_manipulator/shared/sequence.json");
     std::string mission_file = node->get_parameter("mission_file").as_string();
 
     // --- SUBSCRIBERS ---
     auto vision_sub = node->create_subscription<std_msgs::msg::String>(
-        "/vision/detected_objects_json", 10, vision_callback); // Ensure this topic matches Python node
+        "/vision/detected_objects", 10, vision_callback);
     
     auto hmi_sub = node->create_subscription<std_msgs::msg::String>(
         "/hmi/intent_raw", 10, intent_callback);
@@ -169,7 +265,7 @@ int main(int argc, char * argv[]) {
     // --- MOVEIT SETUP ---
     static const std::string PLANNING_GROUP = "fr3_arm"; 
     moveit::planning_interface::MoveGroupInterface move_group(node, PLANNING_GROUP);
-    move_group.setMaxVelocityScalingFactor(0.15); 
+    move_group.setMaxVelocityScalingFactor(0.1); 
     move_group.setMaxAccelerationScalingFactor(0.1);
 
     // --- LOAD MISSION ---
@@ -181,7 +277,7 @@ int main(int argc, char * argv[]) {
         return 0;
     }
 
-    double travel_time_offset = 3.0; 
+    double travel_time_offset = 5.0; 
     auto start_time = std::chrono::steady_clock::now();
 
     RCLCPP_INFO(node->get_logger(), ">>> PROJECT STARTED: %lu Tasks Loaded <<<", mission.size());
@@ -237,8 +333,9 @@ int main(int argc, char * argv[]) {
         RCLCPP_INFO(node->get_logger(), "Moving to %s: (%.2f, %.2f, %.2f)", task.object_name.c_str(), target_obj.x, target_obj.y, target_obj.z);
 
         // Hardcoded orientation (Vertical Grasp)
-        auto pick_pose = create_pose(target_obj.x, target_obj.y, target_obj.z + 0.02, 178.0, 0.0, 45.0);
-        
+        auto pick_pose = create_pose(target_obj.x, target_obj.y, target_obj.z, -172.5, -3.5, -53.2);
+        pick_pose.position.z += 0.10; // Adjust for gripper offset
+
         // Fixed Poses
         auto intermediate_pose = create_pose(0.467, -0.139, 0.40, -172.5, -3.5, -53.2);
         auto release_pose = create_pose(0.598, -0.485, 0.222, -169.2, -4.1, -143.5);
@@ -249,12 +346,14 @@ int main(int argc, char * argv[]) {
         
         // B. Hover & Pick
         auto pre_grasp = pick_pose;
-        pre_grasp.position.z += 0.15;
+        pre_grasp.position.z += 0.10; // Hover 10cm above
+
+        std::this_thread::sleep_for(std::chrono::seconds(10));
         
         if (move_cartesian(move_group, pre_grasp, node, "Pre-Grasp")) {
             if (move_cartesian(move_group, pick_pose, node, "Pick")) {
                 
-                // grasp_object(node); // Uncomment
+                grasp_object(node);
                 std::this_thread::sleep_for(std::chrono::seconds(1));
 
                 move_cartesian(move_group, pre_grasp, node, "Retract");
@@ -268,7 +367,7 @@ int main(int argc, char * argv[]) {
                     std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 }
 
-                // open_gripper(node); // Uncomment
+                open_gripper(node);
                 std::this_thread::sleep_for(std::chrono::seconds(1));
             }
         }

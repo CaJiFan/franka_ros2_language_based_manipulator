@@ -7,7 +7,7 @@ class ObjectPublisher:
     def __init__(self, node):
         # use the provided node to create publisher so everything uses the same ROS node
         self._node = node
-        self._publisher = node.create_publisher(String, 'detected_objects', 10)
+        self._publisher = node.create_publisher(String, '/vision/detected_objects', 10)
 
     def publish(self, object_info):
         msg = String()
