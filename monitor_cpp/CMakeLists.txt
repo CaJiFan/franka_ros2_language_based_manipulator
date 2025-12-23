@@ -42,6 +42,8 @@ install(TARGETS
   DESTINATION lib/${PROJECT_NAME}
 )
 
+include_directories(include)
+
 # Add the new MoveIt node
 add_executable(move_to_pose src/move_to_pose.cpp)
 ament_target_dependencies(move_to_pose
