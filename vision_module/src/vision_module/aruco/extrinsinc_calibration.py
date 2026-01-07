@@ -5,12 +5,12 @@ from scipy.spatial.transform import Rotation as R
 
 def get_camera_transform_from_marker(color_image, camera_matrix, dist_coeffs):
     # --- CONFIGURATION ---
-    marker_size = 0.05  # Size of the printed ArUco in meters (e.g., 5cm)
+    marker_size = 0.015  # Size of the printed ArUco in meters (e.g., 5cm)
     
     # KNOWN POSE: Where did you stick the marker on the table?
     # Example: 30cm forward (x), centered (y), flat on table (z)
     T_base_marker = np.eye(4)
-    T_base_marker[0:3, 3] = [0.30, 0.0, 0.0] 
+    T_base_marker[0:3, 3] = [0.30, 0.0, -0.075] 
     # If marker is flat on table, its Z-axis points UP, same as robot.
     # So rotation is identity (or aligned with how you stuck it).
     # 2. ROTATION:
@@ -20,18 +20,18 @@ def get_camera_transform_from_marker(color_image, camera_matrix, dist_coeffs):
     # Robot Z (Up)      = Marker Z
     
     # Rotation Matrix columns are the Marker's [X, Y, Z] axes expressed in Robot Frame:
-    # Marker X axis points to Robot Right (-Y) -> [ 0, -1,  0]
+    # Marker X axis points to Robot Right (-Y) -> [ 0,  1,  0]
     # Marker Y axis points to Robot Back (-X)  -> [-1,  0,  0]
     # Marker Z axis points Up (+Z)             -> [ 0,  0,  1]
     
     T_base_marker[0:3, 0:3] = np.array([
         [ 0, -1,  0],
-        [-1,  0,  0],
+        [ 1,  0,  0],
         [ 0,  0,  1]
     ])
 
     # --- ARUCO DETECTION ---
-    aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+    aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_ARUCO_ORIGINAL)
     parameters = cv2.aruco.DetectorParameters()
     detector = cv2.aruco.ArucoDetector(aruco_dict, parameters)
 

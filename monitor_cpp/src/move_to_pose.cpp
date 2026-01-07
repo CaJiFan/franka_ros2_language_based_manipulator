@@ -19,6 +19,11 @@
 #include "franka_msgs/action/move.hpp"
 #include "std_msgs/msg/string.hpp"
 
+// geometry messages
+#include "tf2_ros/transform_listener.h"
+#include "tf2_ros/buffer.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
@@ -38,6 +43,10 @@ struct MissionItem {
 std::map<std::string, DetectedObject> object_memory;
 std::mutex memory_mutex;
 std::atomic<bool> release_signal_received(false);
+
+// --- GLOBAL TF BUFFER (So callback can use it) ---
+std::shared_ptr<tf2_ros::Buffer> tf_buffer;
+std::shared_ptr<tf2_ros::TransformListener> tf_listener;
 
 // --- HELPER: Load Mission from JSON File ---
 std::vector<MissionItem> load_mission_from_file(const std::string& filename) {
@@ -213,25 +222,51 @@ void vision_callback(const std_msgs::msg::String::SharedPtr msg) {
         if (data.is_array()) {
             for (const auto& item : data) {
                 std::string label = item["label"];
-                double new_x = item["x"];
-                double new_y = item["y"];
-                double new_z = item["z"];
+                
+                // 1. Get RAW Camera Coordinates
+                double raw_x = item["x"];
+                double raw_y = item["y"];
+                double raw_z = item["z"];
 
-                if (object_memory.find(label) == object_memory.end()) {
-                    object_memory[label] = {new_x, new_y, new_z, label, true};
-                    std::cout << "[VISION] New object stored: " << label << std::endl;
-                } else {
-                    // Update if moved > 2cm
-                    DetectedObject& old = object_memory[label];
-                    double dist = std::sqrt(std::pow(new_x - old.x, 2) + std::pow(new_y - old.y, 2) + std::pow(new_z - old.z, 2));
-                    if (dist > 0.02) {
-                        old.x = new_x; old.y = new_y; old.z = new_z;
-                        std::cout << "[VISION] Memory updated for: " << label << std::endl;
-                    }
+                // 2. Prepare Transform Input
+                geometry_msgs::msg::PointStamped point_camera;
+                point_camera.header.frame_id = "camera_link"; // Defined in launch file 
+                point_camera.point.x = raw_x;
+                point_camera.point.y = raw_y;
+                point_camera.point.z = raw_z;
+
+                geometry_msgs::msg::PointStamped point_robot;
+
+                // 3. Transform to Robot Frame ("fr3_link0")
+                try {
+                    // Check if transform is available
+                    if (tf_buffer->canTransform("fr3_link0", "camera_link", tf2::TimePointZero)) {
+                        
+                        tf_buffer->transform(point_camera, point_robot, "fr3_link0");
+                        
+                        double final_x = point_robot.point.x;
+                        double final_y = point_robot.point.y;
+                        double final_z = point_robot.point.z;
+
+                        // 4. Store ROBOT FRAME coordinates in memory
+                        if (object_memory.find(label) == object_memory.end()) {
+                            object_memory[label] = {final_x, final_y, final_z, label, true};
+                            std::cout << "[VISION] New object stored (Transformed): " << label << std::endl;
+                        } else {
+                            DetectedObject& old = object_memory[label];
+                            double dist = std::sqrt(std::pow(final_x - old.x, 2) + std::pow(final_y - old.y, 2) + std::pow(final_z - old.z, 2));
+                            if (dist > 0.02) {
+                                old.x = final_x; old.y = final_y; old.z = final_z;
+                                std::cout << "[VISION] Memory updated for: " << label << std::endl;
+                            }
+                        }
+                    } 
+                } catch (tf2::TransformException &ex) {
+                    // Startups often fail first few seconds, usually fine to ignore or log debug
                 }
             }
         }
-    } catch (const std::exception& e) { /* Ignore parse errors */ }
+    } catch (const std::exception& e) { }
 }
 
 // --- HMI CALLBACK ---
@@ -245,6 +280,10 @@ void intent_callback(const std_msgs::msg::String::SharedPtr msg) {
 int main(int argc, char * argv[]) {
     rclcpp::init(argc, argv);
     auto node = std::make_shared<rclcpp::Node>("move_to_pose");
+
+    // --- INITIALIZE TF LISTENER ---
+    tf_buffer = std::make_shared<tf2_ros::Buffer>(node->get_clock());
+    tf_listener = std::make_shared<tf2_ros::TransformListener>(*tf_buffer);
 
     rclcpp::executors::MultiThreadedExecutor executor;
     executor.add_node(node);
@@ -265,8 +304,11 @@ int main(int argc, char * argv[]) {
     // --- MOVEIT SETUP ---
     static const std::string PLANNING_GROUP = "fr3_arm"; 
     moveit::planning_interface::MoveGroupInterface move_group(node, PLANNING_GROUP);
-    move_group.setMaxVelocityScalingFactor(0.1); 
-    move_group.setMaxAccelerationScalingFactor(0.1);
+    move_group.setEndEffectorLink("fr3_hand_tcp");
+    move_group.setMaxVelocityScalingFactor(0.07); 
+    move_group.setMaxAccelerationScalingFactor(0.07);
+
+    RCLCPP_INFO(node->get_logger(), "End-effector link: %s", move_group.getEndEffectorLink().c_str());
 
     // --- LOAD MISSION ---
     std::vector<MissionItem> mission = load_mission_from_file(mission_file);
@@ -329,24 +371,43 @@ int main(int argc, char * argv[]) {
             continue;
         }
 
-        // 3. EXECUTE PICK (Uses coordinates from memory)
-        RCLCPP_INFO(node->get_logger(), "Moving to %s: (%.2f, %.2f, %.2f)", task.object_name.c_str(), target_obj.x, target_obj.y, target_obj.z);
-
-        // Hardcoded orientation (Vertical Grasp)
-        auto pick_pose = create_pose(target_obj.x, target_obj.y, target_obj.z, -172.5, -3.5, -53.2);
-        pick_pose.position.z += 0.10; // Adjust for gripper offset
-
         // Fixed Poses
-        auto intermediate_pose = create_pose(0.467, -0.139, 0.40, -172.5, -3.5, -53.2);
-        auto release_pose = create_pose(0.598, -0.485, 0.222, -169.2, -4.1, -143.5);
+        // auto intermediate_pose = create_pose(0.467, 0.00, 0.30, -172.5, -3.5, -53.2);
+        // auto release_pose = create_pose(0.598, -0.485, 0.122, -169.2, -4.1, -143.5);
+        auto intermediate_pose = create_pose(0.45, 0.00, 0.35, 179.5, -5.8, -2.0);
+        auto release_pose = create_pose(0.598, -0.490, 0.20, 179.9, -3.9, -92.2);
 
         // Execution Sequence
         // A. Move to Intermediate
         move_cartesian(move_group, intermediate_pose, node, "Intermediate");
+
+
+        // Hardcoded orientation (Vertical Grasp)
+        auto pick_pose = create_pose(
+            target_obj.x, target_obj.y, target_obj.z,
+            180, 0.0, 90
+        );
+        pick_pose.position.x -= 0.02; // Adjust for practical purposes
+        pick_pose.position.y -= 0.075; // Adjust for practical purposes
+        if (pick_pose.position.z < 0.076){
+            pick_pose.position.z = -0.024; // Safety floor
+        }else{
+            pick_pose.position.z -= 0.10; // Adjust for table height
+        }
+        
+
+        // 3. EXECUTE PICK (Uses coordinates from memory)
+        RCLCPP_INFO(
+            node->get_logger(), 
+            "Moving to %s: (%.2f, %.2f, %.2f, %.2f, %.2f, %.2f)",
+            task.object_name.c_str(), 
+            pick_pose.position.x, pick_pose.position.y, pick_pose.position.z,
+            pick_pose.orientation.x, pick_pose.orientation.y, pick_pose.orientation.z
+        );
         
         // B. Hover & Pick
         auto pre_grasp = pick_pose;
-        pre_grasp.position.z += 0.10; // Hover 10cm above
+        pre_grasp.position.z += 0.103; // Hover 10.3cm above
 
         std::this_thread::sleep_for(std::chrono::seconds(10));
         

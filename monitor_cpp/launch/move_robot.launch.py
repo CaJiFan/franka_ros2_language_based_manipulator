@@ -68,13 +68,27 @@ def generate_launch_description():
     )
 
     # # --- 4. TF PUBLISHER (Camera) ---
-    # static_tf = Node(
-    #     package='tf2_ros',
-    #     executable='static_transform_publisher',
-    #     name='camera_link_broadcaster',
-    #     arguments=['0.544', '-0.16', '0.676', '0', '0', '0', 'base', 'camera_link'],
-    #     output='screen'
-    # )
+    static_tf = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='camera_link_broadcaster',
+        arguments=[
+            # Position (X, Y, Z)
+            # '0.3966', '0.4126', '0.6594',
+            # '0.38600361', '0.51878038', '0.68019778',
+            '0.39098521', '0.48595019', '0.70823142',
+            
+            # Rotation (Qx, Qy, Qz, Qw)
+            # '0.94210637', '-0.07166619', '-0.11180447',  '0.30789496',
+            '-0.1052', '0.9499', '-0.2924', '0.0324',
+            # '-0.5', '0.0', '1.0', '0.0',
+            
+            # Frame IDs
+            'fr3_link0',      # Parent (Robot Base)
+            'camera_link'     # Child (Camera)
+        ],
+        output='screen'
+    )
 
     # --- 5. YOUR NODE ---
     move_node = Node(
@@ -91,6 +105,7 @@ def generate_launch_description():
     )
 
     return LaunchDescription(args + [
-        franka_moveit_launch, # The "One-Liner" that launches everything
+        franka_moveit_launch,
+        static_tf,
         move_node
     ])

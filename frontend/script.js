@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // State
     let tools = [];
     let sequence = [];
+    let handedness = 'right';
 
     // DOM Elements
     const toolListEl = document.getElementById('tool-list');
@@ -17,10 +18,47 @@ document.addEventListener('DOMContentLoaded', () => {
     const importFile = document.getElementById('import-file');
     const configOutput = document.getElementById('config-output');
 
+    const handLeftBtn = document.getElementById('hand-left-btn');
+    const handRightBtn = document.getElementById('hand-right-btn');
+
     // --- Initialization ---
     renderToolList();
     updateToolSelector();
     renderSequence();
+    updateHandednessUI(); // Set initial UI state
+
+    // --- Handedness Logic ---
+    handLeftBtn.addEventListener('click', () => {
+        handedness = 'left';
+        updateHandednessUI();
+        updateConfigPreview(); // Update JSON preview immediately
+    });
+
+    handRightBtn.addEventListener('click', () => {
+        handedness = 'right';
+        updateHandednessUI();
+        updateConfigPreview(); // Update JSON preview immediately
+    });
+
+    function updateHandednessUI() {
+        if (handedness === 'left') {
+            // Set Left as Active (Primary style)
+            handLeftBtn.classList.remove('outline');
+            handLeftBtn.classList.add('primary');
+            
+            // Set Right as Inactive (Outline style)
+            handRightBtn.classList.add('outline');
+            handRightBtn.classList.remove('primary');
+        } else {
+            // Set Right as Active
+            handRightBtn.classList.remove('outline');
+            handRightBtn.classList.add('primary');
+            
+            // Set Left as Inactive
+            handLeftBtn.classList.add('outline');
+            handLeftBtn.classList.remove('primary');
+        }
+    }
 
     // --- Tool Management ---
     addToolBtn.addEventListener('click', () => {
@@ -254,6 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateConfigPreview() {
         const config = {
             project: "Dum-E",
+            handedness: handedness,
             tools: tools,
             sequence: sequence.map(s => ({ tool: s.tool, startTime: s.startTime }))
         };
@@ -291,6 +330,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         tool: s.tool,
                         startTime: s.startTime !== undefined ? s.startTime : (s.duration || 0) // Fallback for old files
                     }));
+                }
+                if (data.handedness) {
+                    handedness = data.handedness;
+                    updateHandednessUI();
                 }
 
                 renderToolList();

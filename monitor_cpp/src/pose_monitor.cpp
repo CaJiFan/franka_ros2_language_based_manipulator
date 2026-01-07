@@ -37,8 +37,8 @@ private:
     // For FR3, it is usually 'fr3_link0' and 'fr3_hand_tcp'
     // If your lab uses the Panda description, it might be 'panda_link0'
     std::string from_frame = "fr3_link0"; 
-    // std::string to_frame = "fr3_hand_tcp";
-    std::string to_frame = "fr3_link8";
+    std::string to_frame = "fr3_hand_tcp";
+    // std::string to_frame = "fr3_link8";
 
     try {
       // Ask TF for the latest transform

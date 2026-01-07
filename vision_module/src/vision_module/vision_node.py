@@ -127,7 +127,6 @@ class VisionNode(Node):
 
             final_x, final_y, final_z = None, None, None
             method = "YOLO" # Default if no marker found
-            print(f"Detected ArUco IDs: {ids}")
             if ids is not None and len(ids) > 0:
                 # MARKER FOUND!
                 method = "ARUCO"
@@ -184,8 +183,10 @@ class VisionNode(Node):
 
             # 4. Transform to Robot Frame (Common for both methods)
             if z_cam > 0:
-                x_robot, y_robot, z_robot = self.transform_to_robot(x_cam, y_cam, z_cam)
+                # x_robot, y_robot, z_robot = self.transform_to_robot(x_cam, y_cam, z_cam)
+                x_robot, y_robot, z_robot = x_cam, y_cam, z_cam
                 rob_text = f"Rob: ({x_robot:.2f}, {y_robot:.2f}, {z_robot:.2f})"
+                print(f"Detected positions: {rob_text}")
                 cv2.putText(debug_image, rob_text, (x1, y1 - 30), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2) # Cyan color, slightly bigger
                 
@@ -215,34 +216,6 @@ class VisionNode(Node):
         aruco_detections = [res for res in results_3d if res['method'] == 'ARUCO']
         published_data = [{"label": d['label'], 'x': d['x'], 'y': d['y'], 'z': d['z']} for d in aruco_detections]
         self.object_publisher.publish(published_data)
-
-    def transform_to_robot(self, x_cam, y_cam, z_cam):
-        # HYPOTHESIS:
-        # Robot X (Forward) <-> Camera -X (Left)
-        # Robot Y (Left)    <-> Camera Y (Down)
-        # Robot Z (Up)      <-> Camera -Z (Backwards)
-        
-        # 1. ROTATION
-        x_rot = -x_cam  # Image Left is Robot Forward
-        y_rot =  y_cam  # Image Down is Robot Left 
-        z_rot = -z_cam  # Image Depth is Robot Down
-
-        # 2. TRANSLATION (Recalculate these with the new rotation!)
-        # Use your measured point (0.644, 0.060, 0.296) to solve:
-        # 0.644 = -(-0.22) + X_offset  -> X_offset = 0.424
-        # 0.060 = (-0.10) + Y_offset   -> Y_offset = 0.160
-        # 0.196 = -(0.48) + Z_offset   -> Z_offset = 0.676
-        
-        cam_x_offset = 0.430
-        cam_y_offset = -0.07
-        cam_z_offset = 0.735
-
-        x_final = x_rot + cam_x_offset
-        y_final = y_rot + cam_y_offset
-        z_final = z_rot + cam_z_offset
-
-        return x_final, y_final, z_final
-
 
     def deproject(self, u, v, z):
         fx = self.intrinsics[0, 0]
