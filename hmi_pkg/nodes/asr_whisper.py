@@ -58,17 +58,27 @@ def sanitize_transcript(text: str, prompt_used: Optional[str]) -> str:
 def _post_process_transcript(text: str) -> str:
     """Apply post-processing corrections to transcript"""
     if not text: return text
-    
+
     corrections = [
-        (r'\bike\s+aken\b', 'pick can'),
-        (r'\bpeak\s+can\b', 'pick can'),
-        (r'\bpicca\s*bott?o\b', 'pick bottle'),
-        (r'\bpick\s+bott?al\b', 'pick bottle'),
-        (r'\bcouncil\b', 'cancel'),
-        (r'\bcounsel\b', 'cancel'),
+        (r'\bteak\b', 'take'),
+        (r'\btek\b', 'take'),
+        (r'\bcake\b', 'take'),
+        (r'\bpeak\b', 'take'),
+        (r'\bpick\b', 'take'),
+        (r'\bgrab\b', 'take'),
+        (r'\bpicca\s*bott?o\b', 'take bottle'),
+        (r'\btake\s+bott?al\b', 'take bottle'),
+        (r'\bfok\b', 'fork'),
+        (r'\bforg\b', 'fork'),
+        (r'\bwork\b', 'fork'),
+        (r'\bpork\b', 'fork'),
+        (r'\bspun\b', 'spoon'),
+        (r'\bspon\b', 'spoon'),
+        (r'\bsoon\b', 'spoon'),
         (r'\brel\s+ease\b', 'release'),
+        (r'\bdrop\b', 'release'),
     ]
-    
+
     result = text
     for pattern, replacement in corrections:
         result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
@@ -150,12 +160,12 @@ def should_drop_low_confidence(text: str, seg_rms: float, seg_ms: int, gate_rms:
     """Check if transcript should be dropped as low confidence hallucination"""
     if not Config.ASR_DROP_LOWCONF_SINGLE_ACTION:
         return False
-    
-    _mono = {"release","stop","next","cancel","pick"}
+
+    _mono = {"release","take"}
     tnorm = text.strip().lower()
-    
-    if (tnorm in _mono or re.match(r'^(release|pick|stop|next|cancel)\s+(cup|bottle|mug|can)$', tnorm)):
+
+    if (tnorm in _mono or re.match(r'^(release|take)\s+(bottle|fork|spoon)$', tnorm)):
         if seg_rms < gate_rms * Config.ASR_LOWCONF_RMS_MULT and seg_ms <= Config.ASR_LOWCONF_MAX_MS:
             return True
-    
+
     return False
