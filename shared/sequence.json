@@ -12,11 +12,11 @@
     },
     {
       "tool": "spoon",
-      "startTime": 10
+      "startTime": 5
     },
     {
       "tool": "bottle",
-      "startTime": 20
+      "startTime": 5
     }
   ]
 }

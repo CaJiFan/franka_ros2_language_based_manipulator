@@ -305,8 +305,8 @@ int main(int argc, char * argv[]) {
     static const std::string PLANNING_GROUP = "fr3_arm"; 
     moveit::planning_interface::MoveGroupInterface move_group(node, PLANNING_GROUP);
     move_group.setEndEffectorLink("fr3_hand_tcp");
-    move_group.setMaxVelocityScalingFactor(0.07); 
-    move_group.setMaxAccelerationScalingFactor(0.07);
+    move_group.setMaxVelocityScalingFactor(0.15); 
+    move_group.setMaxAccelerationScalingFactor(0.15);
 
     RCLCPP_INFO(node->get_logger(), "End-effector link: %s", move_group.getEndEffectorLink().c_str());
 
@@ -375,7 +375,8 @@ int main(int argc, char * argv[]) {
         // auto intermediate_pose = create_pose(0.467, 0.00, 0.30, -172.5, -3.5, -53.2);
         // auto release_pose = create_pose(0.598, -0.485, 0.122, -169.2, -4.1, -143.5);
         auto intermediate_pose = create_pose(0.45, 0.00, 0.35, 179.5, -5.8, -2.0);
-        auto release_pose = create_pose(0.598, -0.490, 0.20, 179.9, -3.9, -92.2);
+        auto release_pose = create_pose(0.598, -0.490, 0.22, 179.9, -3.9, -92.2);
+        // auto release_pose = create_pose(0.219, -0.455, 0.22, 179.9, -3.9, -92.2); // Left handed
 
         // Execution Sequence
         // A. Move to Intermediate
@@ -389,17 +390,17 @@ int main(int argc, char * argv[]) {
         );
         pick_pose.position.x -= 0.02; // Adjust for practical purposes
         pick_pose.position.y -= 0.075; // Adjust for practical purposes
-        if (pick_pose.position.z < 0.076){
+        if (pick_pose.position.z < 0.056){
             pick_pose.position.z = -0.024; // Safety floor
         }else{
-            pick_pose.position.z -= 0.10; // Adjust for table height
+            pick_pose.position.z -= 0.08; // Adjust for table height
         }
         
 
         // 3. EXECUTE PICK (Uses coordinates from memory)
         RCLCPP_INFO(
             node->get_logger(), 
-            "Moving to %s: (%.2f, %.2f, %.2f, %.2f, %.2f, %.2f)",
+            "Moving to %s: (%.3f, %.3f, %.3f, %.2f, %.2f, %.2f)",
             task.object_name.c_str(), 
             pick_pose.position.x, pick_pose.position.y, pick_pose.position.z,
             pick_pose.orientation.x, pick_pose.orientation.y, pick_pose.orientation.z
