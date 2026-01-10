@@ -4,11 +4,13 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <set>
 #include <atomic>
 #include <mutex>
 #include <iostream>
 #include <fstream> // Required for file reading
 #include <chrono>
+#include <algorithm>
 
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
@@ -43,6 +45,13 @@ struct MissionItem {
 std::map<std::string, DetectedObject> object_memory;
 std::mutex memory_mutex;
 std::atomic<bool> release_signal_received(false);
+
+// --- ON-DEMAND MODE GLOBALS ---
+std::atomic<bool> take_signal_received(false);
+std::string requested_object = "";
+std::mutex object_request_mutex;
+std::set<std::string> valid_objects = {"bottle", "fork", "spoon"};
+std::set<std::string> taken_objects;  // Track which objects have been taken (max 3)
 
 // --- GLOBAL TF BUFFER (So callback can use it) ---
 std::shared_ptr<tf2_ros::Buffer> tf_buffer;
@@ -269,11 +278,49 @@ void vision_callback(const std_msgs::msg::String::SharedPtr msg) {
     } catch (const std::exception& e) { }
 }
 
+// --- HELPER: Extract object from message ---
+std::string extract_object_from_message(const std::string& msg_data) {
+    // Convert to lowercase for comparison
+    std::string data = msg_data;
+    std::transform(data.begin(), data.end(), data.begin(), ::tolower);
+
+    // Check for valid objects
+    for (const auto& obj : valid_objects) {
+        if (data.find(obj) != std::string::npos) {
+            return obj;
+        }
+    }
+    return "";
+}
+
 // --- HMI CALLBACK ---
 void intent_callback(const std_msgs::msg::String::SharedPtr msg) {
-    if (msg->data.find("release") != std::string::npos) {
+    std::string data = msg->data;
+    std::transform(data.begin(), data.end(), data.begin(), ::tolower);
+
+    // Check for release command
+    if (data.find("release") != std::string::npos) {
         release_signal_received = true;
         std::cout << "\n[HMI] RELEASE SIGNAL RECEIVED!\n" << std::endl;
+        return;
+    }
+
+    // Check for take command (on-demand mode)
+    if (data.find("take") != std::string::npos) {
+        std::string obj = extract_object_from_message(data);
+        if (!obj.empty()) {
+            std::lock_guard<std::mutex> lock(object_request_mutex);
+            // Check if object was already taken
+            if (taken_objects.find(obj) != taken_objects.end()) {
+                std::cout << "\n[HMI] ERROR: Object '" << obj << "' was already taken!\n" << std::endl;
+                return;
+            }
+            requested_object = obj;
+            take_signal_received = true;
+            std::cout << "\n[HMI] TAKE SIGNAL RECEIVED: " << obj << "\n" << std::endl;
+        } else {
+            std::cout << "\n[HMI] ERROR: Invalid object in take command. Valid: bottle, fork, spoon\n" << std::endl;
+        }
     }
 }
 
@@ -294,6 +341,18 @@ int main(int argc, char * argv[]) {
     node->declare_parameter<std::string>("mission_file", "/home/userlab/cjimenez/franka_ros2_language_based_manipulator/shared/sequence.json");
     std::string mission_file = node->get_parameter("mission_file").as_string();
 
+    // Mode parameter: "sequence" or "on-demand"
+    node->declare_parameter<std::string>("mode", "sequence");
+    std::string mode = node->get_parameter("mode").as_string();
+
+    RCLCPP_INFO(node->get_logger(), ">>> MODE: %s <<<", mode.c_str());
+
+    // Validate mode
+    if (mode != "sequence" && mode != "on-demand") {
+        RCLCPP_ERROR(node->get_logger(), "Invalid mode '%s'. Use 'sequence' or 'on-demand'. Defaulting to 'sequence'.", mode.c_str());
+        mode = "sequence";
+    }
+
     // --- SUBSCRIBERS ---
     auto vision_sub = node->create_subscription<std_msgs::msg::String>(
         "/vision/detected_objects", 10, vision_callback);
@@ -310,128 +369,265 @@ int main(int argc, char * argv[]) {
 
     RCLCPP_INFO(node->get_logger(), "End-effector link: %s", move_group.getEndEffectorLink().c_str());
 
-    // --- LOAD MISSION ---
-    std::vector<MissionItem> mission = load_mission_from_file(mission_file);
+    // Fixed Poses (shared by both modes)
+    auto intermediate_pose = create_pose(0.45, 0.00, 0.35, 179.5, -5.8, -2.0);
+    auto release_pose = create_pose(0.598, -0.490, 0.22, 179.9, -3.9, -92.2);
 
-    if (mission.empty()) {
-        RCLCPP_ERROR(node->get_logger(), "Mission is empty or file not found! Exiting.");
-        rclcpp::shutdown();
-        return 0;
-    }
+    // ========================================================
+    // SEQUENCE MODE
+    // ========================================================
+    if (mode == "sequence") {
+        // --- LOAD MISSION ---
+        std::vector<MissionItem> mission = load_mission_from_file(mission_file);
 
-    double travel_time_offset = 5.0; 
-    auto start_time = std::chrono::steady_clock::now();
-
-    RCLCPP_INFO(node->get_logger(), ">>> PROJECT STARTED: %lu Tasks Loaded <<<", mission.size());
-    // open_gripper(node); // Uncomment if needed
-
-    // --- MAIN EXECUTION LOOP ---
-    for (const auto& task : mission) {
-        
-        RCLCPP_INFO(node->get_logger(), "\n--- NEXT TASK: Pick %s at T=%ds ---", task.object_name.c_str(), task.trigger_time_sec);
-
-        // 1. TIME WAIT LOOP
-        while (rclcpp::ok()) {
-            auto now = std::chrono::steady_clock::now();
-            double elapsed = std::chrono::duration<double>(now - start_time).count();
-            double time_until_trigger = task.trigger_time_sec - elapsed - travel_time_offset;
-
-            if (time_until_trigger <= 0) break; // Time to go!
-
-            if ((int)elapsed % 5 == 0) {
-                 RCLCPP_INFO(node->get_logger(), "Waiting... T-minus %.1f sec", time_until_trigger);
-                 std::this_thread::sleep_for(std::chrono::milliseconds(1005));
-            } else {
-                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            }
+        if (mission.empty()) {
+            RCLCPP_ERROR(node->get_logger(), "Mission is empty or file not found! Exiting.");
+            rclcpp::shutdown();
+            return 0;
         }
 
-        // 2. MEMORY LOOKUP (WAIT if not found)
-        DetectedObject target_obj;
-        bool found = false;
-        
-        // Try looking up the object for 5 seconds if not immediately found
-        for(int i=0; i<50; ++i) {
-            {
-                std::lock_guard<std::mutex> lock(memory_mutex);
-                if (object_memory.find(task.object_name) != object_memory.end()) {
-                    target_obj = object_memory[task.object_name];
-                    found = true;
-                    break;
+        double travel_time_offset = 5.0;
+        auto start_time = std::chrono::steady_clock::now();
+
+        RCLCPP_INFO(node->get_logger(), ">>> PROJECT STARTED (SEQUENCE MODE): %lu Tasks Loaded <<<", mission.size());
+
+        // --- MAIN EXECUTION LOOP (SEQUENCE) ---
+        for (const auto& task : mission) {
+
+            RCLCPP_INFO(node->get_logger(), "\n--- NEXT TASK: Pick %s at T=%ds ---", task.object_name.c_str(), task.trigger_time_sec);
+
+            // 1. TIME WAIT LOOP
+            while (rclcpp::ok()) {
+                auto now = std::chrono::steady_clock::now();
+                double elapsed = std::chrono::duration<double>(now - start_time).count();
+                double time_until_trigger = task.trigger_time_sec - elapsed - travel_time_offset;
+
+                if (time_until_trigger <= 0) break; // Time to go!
+
+                if ((int)elapsed % 5 == 0) {
+                     RCLCPP_INFO(node->get_logger(), "Waiting... T-minus %.1f sec", time_until_trigger);
+                     std::this_thread::sleep_for(std::chrono::milliseconds(1005));
+                } else {
+                     std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 }
             }
-            if(!found) {
-                 if(i==0) RCLCPP_WARN(node->get_logger(), "Scanning for '%s'...", task.object_name.c_str());
-                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+            // 2. MEMORY LOOKUP (WAIT if not found)
+            DetectedObject target_obj;
+            bool found = false;
+
+            // Try looking up the object for 5 seconds if not immediately found
+            for(int i=0; i<50; ++i) {
+                {
+                    std::lock_guard<std::mutex> lock(memory_mutex);
+                    if (object_memory.find(task.object_name) != object_memory.end()) {
+                        target_obj = object_memory[task.object_name];
+                        found = true;
+                        break;
+                    }
+                }
+                if(!found) {
+                     if(i==0) RCLCPP_WARN(node->get_logger(), "Scanning for '%s'...", task.object_name.c_str());
+                     std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
+            }
+
+            if (!found) {
+                RCLCPP_ERROR(node->get_logger(), "SKIPPING: Object '%s' never found in vision memory!", task.object_name.c_str());
+                continue;
+            }
+
+            // Execution Sequence
+            // A. Move to Intermediate
+            move_cartesian(move_group, intermediate_pose, node, "Intermediate");
+
+            // Hardcoded orientation (Vertical Grasp)
+            auto pick_pose = create_pose(
+                target_obj.x, target_obj.y, target_obj.z,
+                180, 0.0, 90
+            );
+            pick_pose.position.x -= 0.02; // Adjust for practical purposes
+            pick_pose.position.y -= 0.075; // Adjust for practical purposes
+            if (pick_pose.position.z < 0.056){
+                pick_pose.position.z = -0.024; // Safety floor
+            }else{
+                pick_pose.position.z -= 0.08; // Adjust for table height
+            }
+
+            // 3. EXECUTE PICK (Uses coordinates from memory)
+            RCLCPP_INFO(
+                node->get_logger(),
+                "Moving to %s: (%.3f, %.3f, %.3f, %.2f, %.2f, %.2f)",
+                task.object_name.c_str(),
+                pick_pose.position.x, pick_pose.position.y, pick_pose.position.z,
+                pick_pose.orientation.x, pick_pose.orientation.y, pick_pose.orientation.z
+            );
+
+            // B. Hover & Pick
+            auto pre_grasp = pick_pose;
+            pre_grasp.position.z += 0.103; // Hover 10.3cm above
+
+            std::this_thread::sleep_for(std::chrono::seconds(10));
+
+            if (move_cartesian(move_group, pre_grasp, node, "Pre-Grasp")) {
+                if (move_cartesian(move_group, pick_pose, node, "Pick")) {
+
+                    grasp_object(node);
+                    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+                    move_cartesian(move_group, pre_grasp, node, "Retract");
+                    move_cartesian(move_group, intermediate_pose, node, "Intermediate");
+                    move_cartesian(move_group, release_pose, node, "Release Zone");
+
+                    // C. Wait for HMI
+                    RCLCPP_WARN(node->get_logger(), "WAITING FOR RELEASE...");
+                    release_signal_received = false;
+                    while(!release_signal_received && rclcpp::ok()) {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    }
+
+                    open_gripper(node);
+                    std::this_thread::sleep_for(std::chrono::seconds(1));
+                }
             }
         }
+    }
+    // ========================================================
+    // ON-DEMAND MODE
+    // ========================================================
+    else if (mode == "on-demand") {
+        RCLCPP_INFO(node->get_logger(), ">>> PROJECT STARTED (ON-DEMAND MODE) <<<");
+        RCLCPP_INFO(node->get_logger(), "Valid objects: bottle, fork, spoon (max 3 takes)");
+        RCLCPP_INFO(node->get_logger(), "Commands: 'take <object>' to pick, 'release' to drop");
 
-        if (!found) {
-            RCLCPP_ERROR(node->get_logger(), "SKIPPING: Object '%s' never found in vision memory!", task.object_name.c_str());
-            continue;
-        }
+        int successful_takes = 0;
+        const int MAX_TAKES = 3;
 
-        // Fixed Poses
-        // auto intermediate_pose = create_pose(0.467, 0.00, 0.30, -172.5, -3.5, -53.2);
-        // auto release_pose = create_pose(0.598, -0.485, 0.122, -169.2, -4.1, -143.5);
-        auto intermediate_pose = create_pose(0.45, 0.00, 0.35, 179.5, -5.8, -2.0);
-        auto release_pose = create_pose(0.598, -0.490, 0.22, 179.9, -3.9, -92.2);
-        // auto release_pose = create_pose(0.219, -0.455, 0.22, 179.9, -3.9, -92.2); // Left handed
+        // Main on-demand loop
+        while (rclcpp::ok() && successful_takes < MAX_TAKES) {
+            // Wait for take command
+            RCLCPP_INFO(node->get_logger(), "\n>>> WAITING FOR TAKE COMMAND... (Successful takes: %d/%d) <<<",
+                        successful_takes, MAX_TAKES);
 
-        // Execution Sequence
-        // A. Move to Intermediate
-        move_cartesian(move_group, intermediate_pose, node, "Intermediate");
+            take_signal_received = false;
+            while (!take_signal_received && rclcpp::ok()) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
 
+            if (!rclcpp::ok()) break;
 
-        // Hardcoded orientation (Vertical Grasp)
-        auto pick_pose = create_pose(
-            target_obj.x, target_obj.y, target_obj.z,
-            180, 0.0, 90
-        );
-        pick_pose.position.x -= 0.02; // Adjust for practical purposes
-        pick_pose.position.y -= 0.075; // Adjust for practical purposes
-        if (pick_pose.position.z < 0.056){
-            pick_pose.position.z = -0.024; // Safety floor
-        }else{
-            pick_pose.position.z -= 0.08; // Adjust for table height
-        }
-        
+            // Get the requested object
+            std::string current_object;
+            {
+                std::lock_guard<std::mutex> lock(object_request_mutex);
+                current_object = requested_object;
+                requested_object = "";
+            }
 
-        // 3. EXECUTE PICK (Uses coordinates from memory)
-        RCLCPP_INFO(
-            node->get_logger(), 
-            "Moving to %s: (%.3f, %.3f, %.3f, %.2f, %.2f, %.2f)",
-            task.object_name.c_str(), 
-            pick_pose.position.x, pick_pose.position.y, pick_pose.position.z,
-            pick_pose.orientation.x, pick_pose.orientation.y, pick_pose.orientation.z
-        );
-        
-        // B. Hover & Pick
-        auto pre_grasp = pick_pose;
-        pre_grasp.position.z += 0.103; // Hover 10.3cm above
+            RCLCPP_INFO(node->get_logger(), "\n--- TAKE REQUESTED: %s ---", current_object.c_str());
 
-        std::this_thread::sleep_for(std::chrono::seconds(10));
-        
-        if (move_cartesian(move_group, pre_grasp, node, "Pre-Grasp")) {
-            if (move_cartesian(move_group, pick_pose, node, "Pick")) {
-                
-                grasp_object(node);
-                std::this_thread::sleep_for(std::chrono::seconds(1));
+            // Look up object in memory
+            DetectedObject target_obj;
+            bool found = false;
 
-                move_cartesian(move_group, pre_grasp, node, "Retract");
-                move_cartesian(move_group, intermediate_pose, node, "Intermediate");
-                move_cartesian(move_group, release_pose, node, "Release Zone");
-
-                // C. Wait for HMI
-                RCLCPP_WARN(node->get_logger(), "WAITING FOR RELEASE...");
-                release_signal_received = false;
-                while(!release_signal_received && rclcpp::ok()) {
+            // Try looking up the object for 5 seconds if not immediately found
+            for (int i = 0; i < 50; ++i) {
+                {
+                    std::lock_guard<std::mutex> lock(memory_mutex);
+                    if (object_memory.find(current_object) != object_memory.end()) {
+                        target_obj = object_memory[current_object];
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    if (i == 0) RCLCPP_WARN(node->get_logger(), "Scanning for '%s'...", current_object.c_str());
                     std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 }
-
-                open_gripper(node);
-                std::this_thread::sleep_for(std::chrono::seconds(1));
             }
+
+            if (!found) {
+                RCLCPP_ERROR(node->get_logger(), "Object '%s' not found in vision memory. Waiting for new command...",
+                             current_object.c_str());
+                continue;  // Wait for another take command
+            }
+
+            // Execute pick sequence
+            RCLCPP_INFO(node->get_logger(), "Object found at (%.3f, %.3f, %.3f)",
+                        target_obj.x, target_obj.y, target_obj.z);
+
+            // A. Move to Intermediate
+            move_cartesian(move_group, intermediate_pose, node, "Intermediate");
+
+            // Hardcoded orientation (Vertical Grasp)
+            auto pick_pose = create_pose(
+                target_obj.x, target_obj.y, target_obj.z,
+                180, 0.0, 90
+            );
+            pick_pose.position.x -= 0.02;
+            pick_pose.position.y -= 0.075;
+            if (pick_pose.position.z < 0.056) {
+                pick_pose.position.z = -0.024;
+            } else {
+                pick_pose.position.z -= 0.08;
+            }
+
+            RCLCPP_INFO(
+                node->get_logger(),
+                "Moving to %s: (%.3f, %.3f, %.3f)",
+                current_object.c_str(),
+                pick_pose.position.x, pick_pose.position.y, pick_pose.position.z
+            );
+
+            // B. Hover & Pick
+            auto pre_grasp = pick_pose;
+            pre_grasp.position.z += 0.103;
+
+            std::this_thread::sleep_for(std::chrono::seconds(10));
+
+            bool pick_successful = false;
+            if (move_cartesian(move_group, pre_grasp, node, "Pre-Grasp")) {
+                if (move_cartesian(move_group, pick_pose, node, "Pick")) {
+
+                    grasp_object(node);
+                    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+                    move_cartesian(move_group, pre_grasp, node, "Retract");
+                    move_cartesian(move_group, intermediate_pose, node, "Intermediate");
+                    move_cartesian(move_group, release_pose, node, "Release Zone");
+
+                    pick_successful = true;
+
+                    // C. Wait for HMI release
+                    RCLCPP_WARN(node->get_logger(), "WAITING FOR RELEASE...");
+                    release_signal_received = false;
+                    while (!release_signal_received && rclcpp::ok()) {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    }
+
+                    open_gripper(node);
+                    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+                    // Mark object as taken
+                    {
+                        std::lock_guard<std::mutex> lock(object_request_mutex);
+                        taken_objects.insert(current_object);
+                    }
+                    successful_takes++;
+                    RCLCPP_INFO(node->get_logger(), "Successfully completed take for '%s'. Total: %d/%d",
+                                current_object.c_str(), successful_takes, MAX_TAKES);
+                }
+            }
+
+            if (!pick_successful) {
+                RCLCPP_ERROR(node->get_logger(), "Pick failed for '%s'. Waiting for new command...",
+                             current_object.c_str());
+                // Don't increment successful_takes, wait for another command
+            }
+        }
+
+        if (successful_takes >= MAX_TAKES) {
+            RCLCPP_INFO(node->get_logger(), "All %d objects have been taken. On-demand session complete.", MAX_TAKES);
         }
     }
 

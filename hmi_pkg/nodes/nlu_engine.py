@@ -107,22 +107,18 @@ class NLU:
         
         # Apply soft phonetic corrections (domain knowledge)
         soft_act = {
-            "pick": {"peak","pig","peek","ike","pik","pic","beak","pick up","grab","take"},
-            "cancel": {"council","cancell","cansel","cancle","cancelled","counsel"},
-            "release": {"releaze","relese","relees","rel ease","reliefs","drop"},
-            "stop": {"top","spot","stock"},
-            "next": {"necks","nest","text"}
+            "take": {"peak","pig","peek","ike","pik","pic","beak","pick up","grab","pick","teak","tech","tek","cake"},
+            "release": {"releaze","relese","relees","rel ease","reliefs","drop"}
         }
         for canon, alset in soft_act.items():
             for w in alset:
                 syn_a_map.setdefault(w, canon)
                 act_aliases.setdefault(canon, set()).add(w)
-        
+
         soft_obj = {
-            "can": {"ken","cane","aken","kan","a can"},
-            "cup": {"cub","cap","kup"},
-            "bottle": {"botto","bottal","batalla","bataille","a bottle","bottol","bottle."},
-            "mug": {"mag","mog","mugg","mug."}
+            "bottle": {"botto","bottal","batalla","bataille","a bottle","bottol","bottle.","modal","bottel","bottled"},
+            "fork": {"fok","forg","forc","work","pork","forks","forchetta"},
+            "spoon": {"spun","spune","spon","spoom","soon","spoons","cucchiaio","tablespoon"}
         }
         for canon, alset in soft_obj.items():
             for w in alset:
@@ -209,8 +205,8 @@ class NLU:
                 if ca and ca in self.actions: canon_action = ca; break
 
         canon_object = None
-        if canon_action and canon_action == "pick":
-            m = self._first_match(clean, {"pick","pick up"})
+        if canon_action and canon_action == "take":
+            m = self._first_match(clean, {"take","pick","pick up","grab"})
             start = m[2] if m else 0
             post = clean[start:].strip()
             om = self._first_match(post, set(self.syn_obj.keys()))

@@ -1,39 +1,29 @@
 {
-  "version": "1.1",
-  "actions": ["pick", "release", "next", "stop", "cancel"],
-  "objects": ["cup", "bottle", "mug", "can", "item"],
-  "standalone_actions": ["stop", "next", "cancel","release"],
-  "object_required_actions": ["pick", "release"],
+  "version": "1.2",
+  "actions": ["take", "release"],
+  "objects": ["bottle", "fork", "spoon"],
+  "standalone_actions": ["release"],
+  "object_required_actions": ["take"],
   "synonyms": {
     "actions": {
-      "pick": ["pick up", "grab", "take", "get", "hold", "lift"],
-      "release": ["drop", "let go", "open gripper", "drop it", "put down", "place"],
-      "next": ["next one", "grab next", "take next", "continue", "proceed"],
-      "stop": ["halt", "freeze", "pause", "wait", "hold on"],
-      "cancel": ["undo", "abort", "never mind", "nevermind", "forget it", "skip"]
+      "take": ["pick", "pick up", "grab", "get", "hold", "lift"],
+      "release": ["drop", "let go", "open gripper", "drop it", "put down", "place"]
     },
     "objects": {
-      "cup": ["glass", "tumbler"],
-      "bottle": ["flask", "container"],
-      "mug": ["coffee cup", "tea cup"],
-      "can": ["tin", "aluminum can", "soda can"],
-      "item": ["object", "thing", "stuff"] 
+      "bottle": ["flask", "container", "water bottle", "drink"],
+      "fork": ["forks", "forchetta"],
+      "spoon": ["spoons", "cucchiaio", "tablespoon"]
     }
   },
   "phonetic_corrections": {
     "actions": {
-      "pick": ["peak", "pig", "peek", "pik", "pic", "beak"],
-      "cancel": ["council", "cancell", "cansel", "cancle"],
-      "release": ["releaze", "relese", "relees", "reliefs"],
-      "stop": ["top", "spot", "stock"],
-      "next": ["necks", "nest", "text"]
+      "take": ["take", "teak", "tech", "tek", "cake"],
+      "release": ["releaze", "relese", "relees", "reliefs"]
     },
     "objects": {
-      "can": ["ken", "kahn", "cann"],
-      "cup": ["cub", "cop", "cupp"],
-      "mug": ["mag", "mugg", "maug"],
-      "bottle": ["modal", "bottel", "bottled"],
-      "item": ["i tem", "it em", "aitem"]
+      "bottle": ["modal", "bottel", "bottled", "botto", "bottal", "batalla", "bataille", "bottol"],
+      "fork": ["fok", "forg", "forc", "work", "pork"],
+      "spoon": ["spun", "spune", "spon", "spoom", "soon"]
     }
   }
 }
