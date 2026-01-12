@@ -96,7 +96,10 @@ def generate_launch_description():
             robot_description,
             robot_description_semantic,
             kinematics_config,
-            {'mission_file': mission_file}
+            {'mission_file': mission_file, 
+             'mode': 'on-demand',  # o sequence
+             'hand': 'right',      # o left
+             }
         ]
     )
 

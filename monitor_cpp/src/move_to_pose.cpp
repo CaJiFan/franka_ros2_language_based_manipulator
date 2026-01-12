@@ -353,6 +353,17 @@ int main(int argc, char * argv[]) {
         mode = "sequence";
     }
 
+    // Hand parameter: "right" or "left"
+    node->declare_parameter<std::string>("hand", "right");
+    std::string hand = node->get_parameter("hand").as_string();
+    RCLCPP_INFO(node->get_logger(), ">>> HAND: %s <<<", hand.c_str());
+
+    // Validate hand side
+    if (hand != "right" && hand != "left") {
+        RCLCPP_ERROR(node->get_logger(), "Invalid hand side '%s'. Use 'right' or 'left'. Defaulting to 'right'.", hand.c_str());
+        hand = "right";
+    }
+
     // --- SUBSCRIBERS ---
     auto vision_sub = node->create_subscription<std_msgs::msg::String>(
         "/vision/detected_objects", 10, vision_callback);
@@ -371,7 +382,9 @@ int main(int argc, char * argv[]) {
 
     // Fixed Poses (shared by both modes)
     auto intermediate_pose = create_pose(0.45, 0.00, 0.35, 179.5, -5.8, -2.0);
-    auto release_pose = create_pose(0.598, -0.490, 0.22, 179.9, -3.9, -92.2);
+    auto release_pose = hand=="right" ? create_pose(0.598, -0.490, 0.22, 179.9, -3.9, -92.2) :
+                                        create_pose(0.219, -0.455, 0.22, 179.9, -3.9, -92.2); // Left handed
+
 
     // ========================================================
     // SEQUENCE MODE
