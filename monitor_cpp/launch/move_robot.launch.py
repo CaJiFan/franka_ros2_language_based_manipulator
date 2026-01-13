@@ -24,11 +24,13 @@ def generate_launch_description():
     args = [
         DeclareLaunchArgument('robot_ip', default_value='172.16.0.2'),
         DeclareLaunchArgument('use_fake_hardware', default_value='false'),
+        DeclareLaunchArgument('mode', default_value='on_demand'),
         DeclareLaunchArgument('mission_file', default_value='/home/userlab/cjimenez/franka_ros2_language_based_manipulator/shared/sequence.json')
     ]
 
     robot_ip = LaunchConfiguration('robot_ip')
     use_fake = LaunchConfiguration('use_fake_hardware')
+    # mode = LaunchConfiguration('mode')
     mission_file = LaunchConfiguration('mission_file')
 
     franka_desc_pkg = get_package_share_directory('franka_description')

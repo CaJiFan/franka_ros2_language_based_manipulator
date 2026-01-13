@@ -342,14 +342,14 @@ int main(int argc, char * argv[]) {
     std::string mission_file = node->get_parameter("mission_file").as_string();
 
     // Mode parameter: "sequence" or "on-demand"
-    node->declare_parameter<std::string>("mode", "sequence");
+    node->declare_parameter<std::string>("mode", "on_demand");
     std::string mode = node->get_parameter("mode").as_string();
 
     RCLCPP_INFO(node->get_logger(), ">>> MODE: %s <<<", mode.c_str());
 
     // Validate mode
-    if (mode != "sequence" && mode != "on-demand") {
-        RCLCPP_ERROR(node->get_logger(), "Invalid mode '%s'. Use 'sequence' or 'on-demand'. Defaulting to 'sequence'.", mode.c_str());
+    if (mode != "sequence" && mode != "on_demand") {
+        RCLCPP_ERROR(node->get_logger(), "Invalid mode '%s'. Use 'sequence' or 'on_demand'. Defaulting to 'sequence'.", mode.c_str());
         mode = "sequence";
     }
 
@@ -480,7 +480,7 @@ int main(int argc, char * argv[]) {
             auto pre_grasp = pick_pose;
             pre_grasp.position.z += 0.103; // Hover 10.3cm above
 
-            std::this_thread::sleep_for(std::chrono::seconds(10));
+            std::this_thread::sleep_for(std::chrono::seconds(2));
 
             if (move_cartesian(move_group, pre_grasp, node, "Pre-Grasp")) {
                 if (move_cartesian(move_group, pick_pose, node, "Pick")) {
@@ -508,7 +508,7 @@ int main(int argc, char * argv[]) {
     // ========================================================
     // ON-DEMAND MODE
     // ========================================================
-    else if (mode == "on-demand") {
+    else if (mode == "on_demand") {
         RCLCPP_INFO(node->get_logger(), ">>> PROJECT STARTED (ON-DEMAND MODE) <<<");
         RCLCPP_INFO(node->get_logger(), "Valid objects: bottle, fork, spoon (max 3 takes)");
         RCLCPP_INFO(node->get_logger(), "Commands: 'take <object>' to pick, 'release' to drop");
@@ -596,7 +596,7 @@ int main(int argc, char * argv[]) {
             auto pre_grasp = pick_pose;
             pre_grasp.position.z += 0.103;
 
-            std::this_thread::sleep_for(std::chrono::seconds(10));
+            // std::this_thread::sleep_for(std::chrono::seconds(10));
 
             bool pick_successful = false;
             if (move_cartesian(move_group, pre_grasp, node, "Pre-Grasp")) {
