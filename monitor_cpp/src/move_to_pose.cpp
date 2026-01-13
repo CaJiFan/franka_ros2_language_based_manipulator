@@ -382,7 +382,7 @@ int main(int argc, char * argv[]) {
 
     // Fixed Poses (shared by both modes)
     auto intermediate_pose = create_pose(0.45, 0.00, 0.35, 179.5, -5.8, -2.0);
-    auto release_pose = hand=="right" ? create_pose(0.598, -0.490, 0.22, 179.9, -3.9, -92.2) :
+    auto release_pose = hand =="right" ? create_pose(0.598, -0.490, 0.22, 179.9, -3.9, -92.2) :
                                         create_pose(0.219, -0.455, 0.22, 179.9, -3.9, -92.2); // Left handed
 
 
