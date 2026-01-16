@@ -1,0 +1,487 @@
+================================================================================
+DUM-E ROBOT INTERACTION STUDY: HYPOTHESIS ANALYSIS
+================================================================================
+
+Analysis Date: 2026-01-14 20:20:26
+Total Participants: n = 25
+
+================================================================================
+HYPOTHESIS 1: ATTENTIONAL DEMAND
+================================================================================
+
+--------------------------------------------------------------------------------
+1. VARIABLE OPERATIONALIZATION
+--------------------------------------------------------------------------------
+
+    HYPOTHESIS H1:
+        "Users have to focus less on the robot during Sequence mode 
+         compared to On-Demand mode."
+    
+    PREDICTION:
+        Focus_Sequence > Focus_On-Demand
+        (Higher score = LESS focus required, per item wording)
+    
+    VARIABLES:
+    
+    A) Attentional Demand - Sequence Mode
+       Item: "I barely had to focus on the robot's individual movements 
+              while executing the task" (Sequence version)
+       Scale: 1-5 Likert (1 = Strongly Disagree, 5 = Strongly Agree)
+       Interpretation: Higher score = Less attentional demand (good)
+    
+    B) Attentional Demand - On-Demand Mode  
+       Item: Same wording (On-Demand version)
+       Scale: 1-5 Likert
+       Interpretation: Higher score = Less attentional demand (good)
+    
+    C) Predictability (Supporting Variable)
+       Item: "I found the robot's movements predictable and easy to follow"
+       Scale: 1-5 Likert
+       Used for: Correlation analysis (do predictable movements reduce attention?)
+    
+    DESIGN:
+        Within-subjects comparison for participants who tested both modes.
+        Participants who tested only one mode are excluded from paired analysis.
+    
+
+--------------------------------------------------------------------------------
+2. DATA EXTRACTION
+--------------------------------------------------------------------------------
+
+  ID  | Condition        | Focus_Seq | Focus_OnD | Predictability
+  -----------------------------------------------------------------
+  P 0 | Seq_only         | 3         | NA        | 4
+  P 1 | OnD_then_Seq     | 4         | 3         | 4
+  P 2 | Seq_then_OnD     | 5         | 5         | 4
+  P 3 | OnD_then_Seq     | 4         | 3         | 5
+  P 4 | OnD_then_Seq     | 4         | 5         | 5
+  P 5 | Seq_then_OnD     | 4         | 4         | 5
+  P 6 | OnD_then_Seq     | 5         | 5         | 5
+  P 7 | Seq_then_OnD     | 2         | 2         | 4
+  P 8 | Seq_then_OnD     | 4         | 4         | 4
+  P 9 | OnD_then_Seq     | 1         | 1         | 5
+  P10 | OnD_then_Seq     | 4         | 4         | 4
+  P11 | Seq_then_OnD     | 4         | 1         | 3
+  P12 | Seq_then_OnD     | 4         | 2         | 5
+  P13 | OnD_then_Seq     | 5         | 1         | 5
+  P14 | Seq_then_OnD     | 5         | 3         | 5
+  P15 | OnD_then_Seq     | 4         | 2         | 5
+  P16 | Seq_only         | 5         | NA        | 5
+  P17 | OnD_then_Seq     | 5         | 4         | 5
+  P18 | Seq_then_OnD     | 4         | 2         | 5
+  P19 | OnD_then_Seq     | 4         | 5         | 5
+  P20 | Seq_only         | 4         | NA        | 5
+  P21 | Seq_only         | 4         | NA        | 4
+  P22 | Seq_then_OnD     | 4         | 2         | 4
+  P23 | OnD_then_Seq     | 4         | 4         | 4
+  P24 | OnD_only         | NA        | 5         | 5
+
+--------------------------------------------------------------------------------
+3. SAMPLE DESCRIPTION
+--------------------------------------------------------------------------------
+
+    TESTING CONDITIONS:
+    
+    Total Participants: n = 25
+    
+    - Tested BOTH modes:     n = 20 (used for paired comparison)
+      - On-Demand first:     n = 11
+      - Sequence first:      n = 9
+    
+    - Tested Sequence ONLY:  n = 4 (excluded from paired test)
+    - Tested On-Demand ONLY: n = 1 (excluded from paired test)
+    
+
+--------------------------------------------------------------------------------
+4. DESCRIPTIVE STATISTICS
+--------------------------------------------------------------------------------
+
+    FOCUS SCORES (all available data):
+    
+    Sequence Mode (n = 24):
+        Mean   = 4.000
+        SD     = 0.933
+        Median = 4.0
+        Range  = [1, 5]
+    
+    On-Demand Mode (n = 21):
+        Mean   = 3.190
+        SD     = 1.436
+        Median = 3.0
+        Range  = [1, 5]
+    
+    PAIRED DATA (both-mode testers, n = 20):
+        Sequence Mean   = 4.000
+        On-Demand Mean  = 3.100
+        Mean Difference = 0.900
+    
+
+    PREDICTABILITY (n = 25):
+        Mean   = 4.560
+        SD     = 0.583
+        Median = 5.0
+    
+
+--------------------------------------------------------------------------------
+5. STATISTICAL ANALYSIS PIPELINE
+--------------------------------------------------------------------------------
+
+    PIPELINE OVERVIEW:
+    
+        Step 5.1: Test normality of paired differences (Shapiro-Wilk)
+                           ↓
+        Step 5.2: Select appropriate paired test
+                           ↓
+        Step 5.3: Compute test statistic and significance
+                           ↓
+        Step 5.4: Effect size and practical interpretation
+                           ↓
+        Step 5.5: Supporting analysis (Predictability correlation)
+    
+
+----------------------------------------
+STEP 5.1: NORMALITY TEST (Shapiro-Wilk)
+----------------------------------------
+
+    For paired comparisons, we test normality of the DIFFERENCES.
+    
+    Paired Differences (Sequence - On-Demand):
+        n = 20
+        Values: ['1', '0', '1', '-1', '0', '0', '0', '0', '0', '0', '3', '2', '4', '2', '2', '1', '2', '-1', '2', '0']
+    
+
+    Shapiro-Wilk Test:
+        H₀: Differences are normally distributed
+        H₁: Differences are NOT normally distributed
+        
+        W statistic = 0.9004
+        p-value     = 0.0420
+        
+        Decision: REJECT H₀ (NOT normal)
+    
+
+----------------------------------------
+STEP 5.2: TEST SELECTION
+----------------------------------------
+
+    DESIGN: Paired (within-subjects) comparison
+    
+    Test Options:
+        - Parametric: Paired t-test (requires normal differences)
+        - Non-parametric: Wilcoxon signed-rank test (no normality assumption)
+    
+    Decision Rationale:
+        Normality violated OR small sample → Wilcoxon signed-rank test
+    
+    SELECTED TEST: WILCOXON SIGNED-RANK TEST
+    
+
+----------------------------------------
+STEP 5.3: HYPOTHESIS TEST
+----------------------------------------
+
+    HYPOTHESES:
+        H₀: Median(Focus_Seq) = Median(Focus_OnD)  [No difference]
+        H₁: Median(Focus_Seq) ≠ Median(Focus_OnD)  [Difference exists]
+    
+    DIRECTIONAL PREDICTION:
+        Focus_Seq > Focus_OnD (Sequence requires less attention)
+    
+    SIGNIFICANCE LEVEL: α = 0.05 (two-tailed)
+    
+
+    WILCOXON SIGNED-RANK TEST:
+    
+        Test statistic W = 6.0
+        p-value          = 0.0086
+        n (pairs)        = 20
+    
+
+    COMPARISON:
+        p < α
+        0.0086 < 0.05
+    
+    DECISION: REJECT H₀
+    
+    INTERPRETATION:
+        The difference IS statistically significant.
+    
+
+----------------------------------------
+STEP 5.4: EFFECT SIZE
+----------------------------------------
+
+    EFFECT SIZE (Rank-biserial correlation):
+    
+        r = 0.9429
+        
+        Cohen's conventions for r:
+            |r| < 0.10  →  Negligible
+            |r| 0.10-0.29  →  Small
+            |r| 0.30-0.49  →  Medium  
+            |r| ≥ 0.50  →  Large
+        
+        Observed |r| = 0.943 → LARGE
+    
+    DIRECTION CHECK:
+        Mean Difference (Seq - OnD) = 0.900
+        Prediction: Sequence > On-Demand (positive difference)
+        Observed:   CONSISTENT with prediction ✓
+    
+    WITHIN-SUBJECT CONSISTENCY:
+    
+        Seq > OnD (expected):  10/20 (50%)
+        Seq = OnD (tied):      8/20 (40%)
+        Seq < OnD (opposite):  2/20 (10%)
+        
+        Consistency: 90% in expected or neutral direction
+    
+
+----------------------------------------
+STEP 5.5: SUPPORTING ANALYSIS (Predictability Correlation)
+----------------------------------------
+
+    RATIONALE:
+        If predictable movements reduce attentional demand, then higher
+        predictability scores should correlate with higher focus scores
+        (i.e., less attention required).
+    
+
+    Spearman Correlation: Predictability × Focus Score
+    
+        n (observations) = 45
+        Spearman's ρ     = 0.1636
+        p-value          = 0.2830
+        
+        Interpretation:
+            No significant correlation found.
+    
+
+--------------------------------------------------------------------------------
+6. HYPOTHESIS CONCLUSION
+--------------------------------------------------------------------------------
+
+    HYPOTHESIS H1:
+        "Users have to focus less on the robot during Sequence mode
+         compared to On-Demand mode."
+    
+    STATISTICAL EVIDENCE:
+        - Wilcoxon W        = 6.0
+        - p-value           = 0.0086
+        - Effect size (r)   = 0.943 (LARGE)
+        - Mean difference   = 0.900
+        - Direction correct = True
+    
+    RESULT: H1 SUPPORTED ✓
+    
+
+    CONCLUSION:
+        There is a statistically significant difference in attentional demand
+        between modes (W = 6.0, p = 0.0086).
+        
+        Users report requiring LESS focus during Sequence mode compared to
+        On-Demand mode, with a large effect size (r = 0.943).
+        
+        This supports the hypothesis that autonomous sequence execution
+        reduces cognitive load compared to active voice-command interaction.
+    
+
+================================================================================
+HYPOTHESIS 2: LEARNABILITY VS TECHNICAL BACKGROUND
+================================================================================
+
+--------------------------------------------------------------------------------
+1. VARIABLE OPERATIONALIZATION
+--------------------------------------------------------------------------------
+
+    HYPOTHESIS H2:
+        "Users with higher technical background perceive the system 
+         as easier to learn."
+    
+    INDEPENDENT VARIABLE: Technical Background
+    
+        Formula: Tech = 0.6 × Self_Assessment_Mean + 0.4 × DoF_Score × 5
+        
+        Components:
+        A) Self-Assessment Mean (60% weight)
+           - 7 items (columns G-M): Understanding of robotics concepts
+           - Scale: 1-5 Likert each
+           
+        B) DoF Score (40% weight)
+           - Objective test: "What does Degrees of Freedom refer to?"
+           - Binary: 1 if correct (mentions "independent joints/axes"), 0 otherwise
+           - Scaled ×5 to match 1-5 range
+        
+        Scale Range: 0.6 (minimum) to 5.0 (maximum)
+    
+    DEPENDENT VARIABLE: Learnability
+    
+        Source: SUS Learnability Subscale (4 items)
+        
+        Items:
+        - AT: "Easy to use" (positive)
+        - AU: "Need technical support" (negative → reversed)
+        - AX: "Learn quickly" (positive)
+        - AZ: "Confident" (positive)
+        
+        Scoring: Transform to 0-4, average, multiply by 25 → 0-100 scale
+    
+
+--------------------------------------------------------------------------------
+2. DATA EXTRACTION
+--------------------------------------------------------------------------------
+
+  ID  | Self-Assess | DoF | Tech Composite | Learnability
+  ------------------------------------------------------------
+  P 0 |    3.29     |  ✓  |      3.97       |    81.25
+  P 1 |    1.57     |  ✓  |      2.94       |    68.75
+  P 2 |    5.00     |  ✓  |      5.00       |    100.00
+  P 3 |    2.71     |  ✓  |      3.63       |    50.00
+  P 4 |    2.00     |  ✗  |      1.20       |    68.75
+  P 5 |    5.00     |  ✓  |      5.00       |    81.25
+  P 6 |    4.93     |  ✗  |      2.96       |    68.75
+  P 7 |    2.86     |  ✓  |      3.71       |    75.00
+  P 8 |    3.43     |  ✓  |      4.06       |    87.50
+  P 9 |    3.29     |  ✓  |      3.97       |    75.00
+  P10 |    2.29     |  ✓  |      3.37       |    100.00
+  P11 |    1.43     |  ✓  |      2.86       |    81.25
+  P12 |    1.71     |  ✗  |      1.03       |    68.75
+  P13 |    2.71     |  ✓  |      3.63       |    75.00
+  P14 |    4.71     |  ✓  |      4.83       |    100.00
+  P15 |    1.71     |  ✓  |      3.03       |    87.50
+  P16 |    1.29     |  ✓  |      2.77       |    75.00
+  P17 |    4.86     |  ✓  |      4.91       |    100.00
+  P18 |    3.57     |  ✓  |      4.14       |    81.25
+  P19 |    3.57     |  ✓  |      4.14       |    100.00
+  P20 |    4.57     |  ✓  |      4.74       |    87.50
+  P21 |    3.57     |  ✓  |      4.14       |    75.00
+  P22 |    3.71     |  ✓  |      4.23       |    75.00
+  P23 |    2.43     |  ✓  |      3.46       |    50.00
+  P24 |    3.57     |  ✓  |      4.14       |    87.50
+
+--------------------------------------------------------------------------------
+3. DESCRIPTIVE STATISTICS
+--------------------------------------------------------------------------------
+
+    TECHNICAL BACKGROUND (n = 25):
+        Mean   = 3.675
+        SD     = 1.026
+        Median = 3.971
+        Range  = [1.03, 5.00]
+        
+        DoF Question: 22/25 correct (88.0%)
+    
+    LEARNABILITY (n = 25):
+        Mean   = 80.000
+        SD     = 13.975
+        Median = 81.250
+        Range  = [50.00, 100.00]
+    
+
+--------------------------------------------------------------------------------
+4. STATISTICAL ANALYSIS PIPELINE
+--------------------------------------------------------------------------------
+
+    PIPELINE:
+        Step 4.1: Test normality (Shapiro-Wilk)
+                           ↓
+        Step 4.2: Select correlation test
+                           ↓
+        Step 4.3: Compute correlation and significance
+                           ↓
+        Step 4.4: Effect size interpretation
+    
+
+----------------------------------------
+STEP 4.1: NORMALITY TEST (Shapiro-Wilk)
+----------------------------------------
+
+    Technical Background:
+        W = 0.8989, p = 0.0174
+        Decision: NOT normal
+    
+    Learnability:
+        W = 0.9183, p = 0.0469
+        Decision: NOT normal
+    
+
+    CONCLUSION:
+        At least one variable violates normality.
+        SELECTED TEST: SPEARMAN'S RANK CORRELATION
+    
+
+----------------------------------------
+STEP 4.2: CORRELATION ANALYSIS
+----------------------------------------
+
+    HYPOTHESES:
+        H₀: ρ = 0 (no correlation)
+        H₁: ρ ≠ 0 (correlation exists)
+    
+    RESULTS:
+        Spearman's ρ = 0.5968
+        p-value     = 0.0016
+        n           = 25
+    
+
+    DECISION:
+        p < α (0.05)
+        REJECT H₀
+        
+        The correlation IS statistically significant.
+    
+
+----------------------------------------
+STEP 4.3: EFFECT SIZE
+----------------------------------------
+
+    Effect Size: MODERATE POSITIVE
+        |Spearman's ρ| = 0.597
+        
+        Cohen's conventions:
+        |r| < 0.20 → Negligible
+        |r| 0.20-0.39 → Weak
+        |r| 0.40-0.69 → Moderate
+        |r| ≥ 0.70 → Strong
+    
+    Variance Explained: R² = 0.3562 (35.6%)
+    
+
+--------------------------------------------------------------------------------
+5. HYPOTHESIS CONCLUSION
+--------------------------------------------------------------------------------
+
+    HYPOTHESIS H2:
+        "Users with higher technical background perceive the system
+         as easier to learn."
+    
+    STATISTICAL EVIDENCE:
+        - Spearman's ρ  = 0.597
+        - p-value      = 0.0016
+        - Effect size  = MODERATE POSITIVE
+        - R²           = 35.6%
+    
+    RESULT: H2 SUPPORTED ✓
+    
+
+    CONCLUSION:
+        There is a statistically significant moderate positive correlation
+        between technical background and perceived learnability
+        (Spearman's ρ = 0.597, p = 0.0016).
+        
+        Users with greater technical expertise rate the system as easier to learn.
+        Technical background explains 35.6% of learnability variance.
+    
+
+================================================================================
+SUMMARY OF RESULTS
+================================================================================
+
+    H1 (Attentional Demand): SUPPORTED ✓
+        Sequence mode requires less attention than On-Demand mode.
+        W = 6.0, p = 0.0086, r = 0.943
+    
+    H2 (Learnability vs Technical Background): SUPPORTED ✓
+        Technical background correlates with perceived learnability.
+        Spearman's ρ = 0.597, p = 0.0016
+    
